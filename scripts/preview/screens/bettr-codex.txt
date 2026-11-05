@@ -1,0 +1,11 @@
+
+\e[2m›\e[0m \e[1mreview the paper theme colours\e[0m
+
+\e[36m•\e[0m Read themes/bettr.json
+
+\e[36m•\e[0m Text and borders pass contrast in both modes.
+  One note: \e[1mdim\e[0m on \e[1mraised\e[0m is close in light mode. Darken it a little.
+
+\e[36m•\e[0m No other problems found.
+
+\e[32m✔ Done\e[0m

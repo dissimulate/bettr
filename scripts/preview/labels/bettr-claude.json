@@ -1,0 +1,356 @@
+{
+  "bettr.activity": {
+    "version": 4,
+    "provider": "claude",
+    "sessionId": "demo-bettr",
+    "turns": [
+      {
+        "id": 1,
+        "prompt": "add a bettr theme with a paper light mode",
+        "startedAt": 2400,
+        "endedAt": 2000,
+        "outcome": "done"
+      },
+      {
+        "id": 2,
+        "prompt": "colour the spaces from the Context panel's rainbow",
+        "startedAt": 1500,
+        "endedAt": 1230,
+        "outcome": "done"
+      },
+      {
+        "id": 3,
+        "prompt": "generate a screenshot of the layout with fake data for the README",
+        "startedAt": 900
+      }
+    ]
+  },
+  "bettr.activity.1": {
+    "entries": [
+      {
+        "kind": "read",
+        "tool": "Read",
+        "items": [
+          "themes/bettr.json",
+          "layouts/bettr.json"
+        ],
+        "at": 2390
+      },
+      {
+        "kind": "edit",
+        "tool": "Edit",
+        "files": [
+          [
+            "themes/bettr.json",
+            64,
+            0,
+            "created"
+          ],
+          [
+            "layouts/bettr.json",
+            1,
+            1,
+            "modified"
+          ]
+        ],
+        "at": 2200
+      },
+      {
+        "kind": "run",
+        "label": "python3 scripts/install.py --update",
+        "result": "ok",
+        "at": 2010
+      }
+    ],
+    "reply": "Added the **bettr** theme. Dark is the default; light mode uses paper.\n\n- Theme in `themes/bettr.json`\n- The installer copies it"
+  },
+  "bettr.activity.2": {
+    "entries": [
+      {
+        "kind": "search",
+        "tool": "Grep",
+        "items": [
+          "COLORS",
+          "space.colors"
+        ],
+        "repeat": 2,
+        "at": 1490
+      },
+      {
+        "kind": "read",
+        "tool": "Read",
+        "items": [
+          "mods/bettr-context/main.js",
+          "mods/bettr-spaces/main.js"
+        ],
+        "at": 1428
+      },
+      {
+        "kind": "message",
+        "text": "The Context panel has a seven-colour rainbow. I will give each new space the next colour from it.",
+        "at": 1365
+      },
+      {
+        "kind": "edit",
+        "tool": "Edit",
+        "files": [
+          [
+            "mods/bettr-spaces/main.js",
+            14,
+            3,
+            "modified"
+          ]
+        ],
+        "at": 1303
+      },
+      {
+        "kind": "run",
+        "label": "git commit -m 'Space colours from the Context panel rainbow'",
+        "result": "ok",
+        "at": 1240
+      }
+    ],
+    "reply": "New spaces now take the next colour of the Context panel's rainbow."
+  },
+  "bettr.activity.3": {
+    "entries": [
+      {
+        "kind": "search",
+        "tool": "Grep",
+        "items": [
+          "HERDR_APP_HOME",
+          "appHome"
+        ],
+        "repeat": 3,
+        "at": 890
+      },
+      {
+        "kind": "read",
+        "tool": "Read",
+        "items": [
+          "scripts/install.py",
+          "mods/bettr-usage/main.js",
+          "mods/bettr-chrome/system.js"
+        ],
+        "at": 860
+      },
+      {
+        "kind": "agent",
+        "tool": "Agent",
+        "label": "Find where each panel reads its data",
+        "at": 840
+      },
+      {
+        "kind": "run",
+        "label": "herdr-app --skill",
+        "result": "ok",
+        "at": 820
+      },
+      {
+        "kind": "run",
+        "label": "hc machine add --help",
+        "result": "ok",
+        "at": 800,
+        "repeat": 3
+      },
+      {
+        "kind": "run",
+        "label": "rg -n appHome mods",
+        "result": "ok",
+        "at": 790
+      },
+      {
+        "kind": "message",
+        "text": "A second window can have its own app home, HOME and core. Your spaces, machines and caches stay out of it.",
+        "at": 740
+      },
+      {
+        "kind": "edit",
+        "tool": "Write",
+        "files": [
+          [
+            "scripts/preview.py",
+            214,
+            0,
+            "created"
+          ],
+          [
+            "scripts/preview/demo.json",
+            48,
+            0,
+            "created"
+          ],
+          [
+            "scripts/preview/fake_agent.py",
+            26,
+            0,
+            "created"
+          ]
+        ],
+        "at": 640
+      },
+      {
+        "kind": "run",
+        "label": "python3 scripts/install.py --target /tmp/bettr-k2/app",
+        "result": "ok",
+        "at": 580
+      },
+      {
+        "kind": "run",
+        "label": "jq .spaces scripts/preview/demo.json",
+        "result": "ok",
+        "at": 560
+      },
+      {
+        "kind": "run",
+        "label": "python3 scripts/preview.py",
+        "result": "ok",
+        "at": 430,
+        "repeat": 2
+      },
+      {
+        "kind": "steer",
+        "label": "also show a remote machine",
+        "at": 380
+      },
+      {
+        "kind": "edit",
+        "tool": "Edit",
+        "files": [
+          [
+            "scripts/preview/demo.json",
+            9,
+            1,
+            "modified"
+          ]
+        ],
+        "at": 340
+      },
+      {
+        "kind": "run",
+        "label": "python3 scripts/preview.py",
+        "at": 30
+      }
+    ]
+  },
+  "bettr.subagents": {
+    "version": 2,
+    "provider": "claude",
+    "sessionId": "demo-bettr",
+    "updatedAt": 10,
+    "agents": [
+      {
+        "id": "demo-scout",
+        "type": "Explore",
+        "status": "working",
+        "startedAt": 840,
+        "updatedAt": 15,
+        "name": "Scout",
+        "description": "Find where each panel reads its data",
+        "model": "claude-haiku-5-5",
+        "modelLabel": "haiku-5-5"
+      }
+    ]
+  },
+  "bettr.context": {
+    "version": 1,
+    "provider": "claude",
+    "sessionId": "demo-bettr",
+    "used": 84200,
+    "exact": true,
+    "window": 200000,
+    "reserved": 33000,
+    "model": "claude-opus-5-5",
+    "compactions": 1,
+    "log": [
+      {
+        "at": 5400,
+        "trigger": "auto",
+        "before": 167000,
+        "after": 14800,
+        "took": 31.2
+      }
+    ],
+    "rows": [
+      {
+        "key": "messages",
+        "label": "Messages",
+        "tokens": 46100,
+        "parts": [
+          {
+            "label": "Read",
+            "tokens": 18400
+          },
+          {
+            "label": "Bash",
+            "tokens": 9700
+          },
+          {
+            "label": "Assistant",
+            "tokens": 8200
+          },
+          {
+            "label": "User",
+            "tokens": 3100
+          },
+          {
+            "label": "Other",
+            "tokens": 6700
+          }
+        ]
+      },
+      {
+        "key": "tools",
+        "label": "Tools",
+        "tokens": 14200
+      },
+      {
+        "key": "skills",
+        "label": "Skills",
+        "tokens": 3900
+      },
+      {
+        "key": "memory",
+        "label": "Memory",
+        "tokens": 2600
+      },
+      {
+        "key": "agents",
+        "label": "Agents",
+        "tokens": 1800
+      },
+      {
+        "key": "system",
+        "label": "System",
+        "tokens": 12400
+      },
+      {
+        "key": "mcp",
+        "label": "MCP",
+        "tokens": 3200
+      }
+    ],
+    "cache": {
+      "requests": 64,
+      "read": 4210000,
+      "written": 188000,
+      "rewritten": 41200,
+      "uncached": 210,
+      "since": 5600,
+      "misses": [
+        {
+          "at": 5390,
+          "lost": 152000,
+          "compaction": true
+        },
+        {
+          "at": 1210,
+          "lost": 41200,
+          "rewritten": 41200,
+          "idle": 3720,
+          "ttl": 3600
+        }
+      ]
+    }
+  }
+}

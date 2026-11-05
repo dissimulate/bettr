@@ -1,0 +1,45 @@
+{
+  "window": {"width": 1600, "height": 940, "appearance": "dark", "panel": [290, 260]},
+  "system": {"cpu": 18, "gpu": 7, "used": 21.4, "total": 32},
+  "usage": [
+    {"agent": "claude", "name": "Claude Code", "windows": [{"label": "Weekly", "used": 61, "resetsIn": 302400}]},
+    {"agent": "codex", "name": "Codex", "windows": [{"label": "Weekly", "used": 27, "resetsIn": 432000}]}
+  ],
+  "panels": ["activity", "context"],
+  "machines": ["mac-mini"],
+  "spaces": [
+    {"name": "Bettr", "folder": "bettr", "tabs": [
+      {"name": "preview", "panes": [
+        {"app": "claude-code", "status": "working", "screen": "screens/bettr-claude.txt", "since": 900,
+         "labels": "labels/bettr-claude.json", "focus": true}
+      ]},
+      {"name": "review", "panes": [
+        {"app": "codex", "status": "done", "screen": "screens/bettr-codex.txt", "since": 1800}
+      ]}
+    ]},
+    {"name": "My Game", "folder": "my-game", "tabs": [
+      {"name": "auth", "panes": [
+        {"app": "claude-code", "status": "done", "screen": "screens/api-claude.txt", "since": 2700}
+      ]},
+      {"name": "server", "panes": [
+        {"argv": ["/bin/zsh"]}
+      ]}
+    ]},
+    {"name": "Web App", "folder": "web-app", "tabs": [
+      {"name": "deploy", "panes": [
+        {"app": "claude-code", "status": "working", "screen": "screens/infra-deploy.txt", "since": 1320}
+      ]},
+      {"name": "alerts", "panes": [
+        {"app": "codex", "status": "working", "screen": "screens/infra-alerts.txt", "since": 600}
+      ]},
+      {"name": "costs", "panes": [
+        {"app": "claude-code", "status": "idle", "screen": "screens/infra-costs.txt", "since": 5400}
+      ]}
+    ]},
+    {"name": "Another One", "folder": "another-one", "machine": "mac-mini", "tabs": [
+      {"name": "guide", "panes": [
+        {"app": "codex", "status": "idle", "screen": "screens/docs-codex.txt", "since": 10800}
+      ]}
+    ]}
+  ]
+}

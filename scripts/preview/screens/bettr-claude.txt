@@ -1,0 +1,43 @@
+\e[35m●\e[0m \e[1mBash\e[0m python3 scripts/install.py --target /tmp/bettr-k2/app
+  \e[2mInstalled /tmp/bettr-k2/app/layouts/bettr.json
+  Installed /tmp/bettr-k2/app/themes/bettr.json
+  Installed /tmp/bettr-k2/app/mods/bettr-usage/main.js
+  Installed /tmp/bettr-k2/app/mods/bettr-usage/report_usage.py
+  Installed /tmp/bettr-k2/app/mods/bettr-spaces/main.js
+  Installed /tmp/bettr-k2/app/mods/bettr-chrome/main.js
+  Installed /tmp/bettr-k2/app/mods/bettr-chrome/system.js
+  Installed /tmp/bettr-k2/app/mods/bettr-tabs/main.js
+  Installed /tmp/bettr-k2/app/mods/bettr-reporter/report.py
+  Installed /tmp/bettr-k2/app/mods/bettr-activity/main.js
+  Installed /tmp/bettr-k2/app/mods/bettr-activity/model.js
+  Installed /tmp/bettr-k2/app/mods/bettr-context/main.js
+  Installed /tmp/bettr-k2/app/mods/bettr-context/model.js
+  … +41 lines
+  No existing files needed a backup.\e[0m
+
+\e[35m●\e[0m \e[1mBash\e[0m python3 scripts/preview.py
+  \e[2mapp home   /tmp/bettr-k2/app
+  core       default
+  usage      claude 61% · codex 27% (Weekly)
+  space      Bettr        footer, review
+  space      My Game      auth, server
+  space      Web App      deploy, alerts, costs
+  panels     activity, context\e[0m
+  Ready: take the screenshot (Cmd-Shift-4, Space, click the window).
+
+\e[2m>\e[0m also show a remote machine
+
+\e[35m●\e[0m \e[1mBash\e[0m hc machine add --via 'sh -c' --name mac-mini --session mac-mini
+  \e[2m{"machine":"mac-mini","state":"connected","version":"0.1.18"}\e[0m
+
+\e[35m●\e[0m \e[1mEdit\e[0m scripts/preview/demo.json \e[32m+9\e[0m \e[31m-1\e[0m
+
+\e[35m●\e[0m Every number comes from demo.json, so each screenshot looks the same.
+
+\e[35m●\e[0m \e[1mBash\e[0m python3 scripts/preview.py
+  \e[2mapp home   /tmp/bettr-k2/app
+  core       default, mac-mini
+  space      Another One  guide (mac-mini)\e[0m
+  Ready: take the screenshot (Cmd-Shift-4, Space, click the window).
+
+\e[33m✻ Waiting for the screenshot…\e[0m \e[2m(14m 50s · esc to interrupt)\e[0m

@@ -1,0 +1,6 @@
+
+\e[2m›\e[0m \e[1madd a getting started page\e[0m
+
+\e[36m•\e[0m Added docs/getting-started.md and linked it from the README.
+
+\e[2m›\e[0m 

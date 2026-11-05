@@ -1,0 +1,7 @@
+
+\e[2m>\e[0m \e[1mwhy did the storage bill go up last month\e[0m
+
+\e[35m●\e[0m Old gallery exports were never deleted: 1.8 TB in \e[1mexports/\e[0m.
+  A 30-day lifecycle rule on that prefix removes them.
+
+\e[2m>\e[0m 

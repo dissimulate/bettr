@@ -1,0 +1,11 @@
+
+\e[2m>\e[0m \e[1mmove the staging deploy to the new cluster\e[0m
+
+\e[35m●\e[0m \e[1mRead\e[0m deploy/staging.yaml, deploy/cluster.tf
+
+\e[35m●\e[0m \e[1mEdit\e[0m deploy/staging.yaml \e[32m+12\e[0m \e[31m-9\e[0m
+
+\e[35m●\e[0m \e[1mBash\e[0m terraform plan -target=module.staging
+  \e[2mPlan: 3 to add, 1 to change, 0 to destroy.\e[0m
+
+\e[33m✻ Applying…\e[0m \e[2m(2m 12s · esc to interrupt)\e[0m

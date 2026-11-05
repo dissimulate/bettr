@@ -1,0 +1,8 @@
+
+\e[2m›\e[0m \e[1mgroup the disk alerts by host\e[0m
+
+\e[36m•\e[0m Read alerts/disk.rules.yml
+
+\e[36m•\e[0m Editing the rules to group by \e[1minstance\e[0m and wait 5m before firing.
+
+\e[33m• Working\e[0m \e[2m(48s · esc to interrupt)\e[0m

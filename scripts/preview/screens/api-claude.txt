@@ -1,0 +1,9 @@
+
+\e[2m>\e[0m \e[1mrotate the session keys and add a migration\e[0m
+
+\e[35m●\e[0m \e[1mEdit\e[0m migrations/0042_rotate_session_keys.sql \e[32m+18\e[0m
+
+\e[35m●\e[0m \e[1mBash\e[0m npm run migrate -- --env local
+  \e[2m✓ 0042_rotate_session_keys applied\e[0m
+
+\e[35m●\e[0m Done. New sessions use the rotated keys; old sessions expire in 24h.
