@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, call, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import report_usage as usage  # noqa: E402
@@ -63,6 +63,16 @@ class LoginTests(unittest.TestCase):
             with patch.dict(os.environ, {**clean, **env}, clear=True):
                 suffix = f"-{hashlib.sha256(hashed.encode()).hexdigest()[:8]}" if hashed else ""
                 self.assertEqual(usage.claude_login(), (folder, f"Claude Code-credentials{suffix}"), env)
+
+
+class TlsTests(unittest.TestCase):
+    def test_system_certificates_are_used_only_when_python_has_none(self):
+        for count, expected in ((0, [call(usage.SYSTEM_CAS)]), (128, [])):
+            context = MagicMock()
+            context.cert_store_stats.return_value = {"x509_ca": count}
+            with patch("ssl.create_default_context", return_value=context), patch.object(usage.os.path, "exists", return_value=True):
+                self.assertIs(usage.tls_context(), context)
+            self.assertEqual(context.load_verify_locations.call_args_list, expected, count)
 
 
 if __name__ == "__main__":

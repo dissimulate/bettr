@@ -39,6 +39,7 @@ INTERVAL_S = 120
 MAX_WAIT_S = 900
 CLICK_GAP_S = 30  # A click asks at once, even while hooks wait, but not twice in 30 s.
 TIMEOUT_S = 10  # Per agent, so --now stays inside Herdr's 30 s exec limit.
+SYSTEM_CAS = "/etc/ssl/cert.pem"
 
 
 def epoch(value):
@@ -138,6 +139,16 @@ def settle(ok, retry_after=0):
     gate(change)
 
 
+def tls_context():
+    """Python from python.org has no CA certificates until its "Install Certificates" step has run.
+    Then all HTTPS fails, so use the certificates that macOS includes."""
+    import ssl
+    context = ssl.create_default_context()
+    if not context.cert_store_stats()["x509_ca"] and os.path.exists(SYSTEM_CAS):
+        context.load_verify_locations(SYSTEM_CAS)
+    return context
+
+
 def claude(_hook, forced):
     if not claim(forced):  # Hooks fire on every tool call; nearly all of them stop here.
         return None
@@ -152,7 +163,7 @@ def claude(_hook, forced):
         "User-Agent": "bettr-usage",
     })
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
+        with urllib.request.urlopen(request, timeout=TIMEOUT_S, context=tls_context()) as response:
             usage = json.load(response)
     except urllib.error.HTTPError as error:
         retry = error.headers.get("Retry-After", "")
