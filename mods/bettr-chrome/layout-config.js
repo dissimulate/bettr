@@ -3,6 +3,8 @@
 // Files, Changes, Activity and Context are buttons in the tab bar (bettr-tabs), kept in
 // shared "bettr.panels". Until changed here, Files and Changes follow Herdr's
 // setup (the welcome's "workspace.panels"); Activity and Context, ours, are on.
+// Other mods' panels (bettr-tabs/panel-mods.js) come from shared "bettr.modPanels", which
+// bettr-tabs publishes. They are on until turned off here: shared "bettr.modPanelsOff".
 // Machines lists each connected machine and whether the agent reporter there
 // (mods/bettr-reporter/setup.py: Activity and Context data) is set up and current; its
 // button installs or updates it.
@@ -12,8 +14,9 @@ import { v_flex, h_flex } from "gpui-base";
 import { run, props, closeOverlay, layout, shared, setShared, exec, appHome, machines } from "herdr";
 
 const remotes = () => machines().map((m) => m.name).filter(Boolean);
-// The dialog's size when it opens: room for one row per machine.
-export const layoutSize = () => ({ width: 340, height: 300 + (remotes().length ? 54 + 30 * remotes().length : 0) });
+const modPanels = () => shared("bettr.modPanels") ?? [];
+// The dialog's size when it opens: room for one row per mod panel and per machine.
+export const layoutSize = () => ({ width: 340, height: 300 + 30 * modPanels().length + (remotes().length ? 54 + 30 * remotes().length : 0) });
 
 // Per machine: { state, agents?, detail? }. state is checking, installing, current,
 // old, missing or error. Kept while the app runs; checked again each time the dialog opens.
@@ -85,13 +88,23 @@ function setPanel(id, on) {
   // Turned off while open: bettr-tabs closes it, and the panel when no other is open.
 }
 
-const ROWS = [
+const modPanelsOff = () => shared("bettr.modPanelsOff") ?? [];
+
+function setModPanel(id, on) {
+  const now = modPanelsOff().filter((p) => p !== id);
+  setShared("bettr.modPanelsOff", on ? now : [...now, id]);
+  // Turned off while open: bettr-tabs closes it, as for setPanel.
+}
+
+const rows = () => [
   { section: "Sidebar" },
   { id: "usage", label: "Usage limits", on: () => !find(layout(), "usage-limits")?.hidden,
     set: (on) => run(on ? "layout.show" : "layout.hide", { id: "usage-limits" }) },
   { section: "Panels" },
   ...[["files", "Files"], ["changes", "Changes"], ["activity", "Activity"], ["context", "Context"]].map(([id, label]) => (
     { id, label, on: () => panels().includes(id), set: (on) => setPanel(id, on) })),
+  ...modPanels().map(({ id, title }) => (
+    { id, label: title, on: () => !modPanelsOff().includes(id), set: (on) => setModPanel(id, on) })),
 ];
 
 function toggle(t, on) {
@@ -107,7 +120,7 @@ export function layoutConfig(t) {
       .child(div().id("layout-close").text_size(11).text_color(t.dim).cursor_pointer()
         .hover((s) => s.text_color(t.foreground))
         .on_click(() => closeOverlay(props().overlay)).child("Esc")))
-    .children(ROWS.map((r) => r.section
+    .children(rows().map((r) => r.section
       ? div().pt(10).pb(2).text_size(11).text_color(t.dim).child(r.section)
       : h_flex().id(`layout-${r.id}`).h(30).px(8).mx(-8).gap(9).items_center().rounded(7).cursor_pointer()
         .hover((s) => s.bg(t.hover))

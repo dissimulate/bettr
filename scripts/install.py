@@ -2,6 +2,7 @@
 """Copy this package into Herdr; merge agent hooks only with --hooks."""
 import argparse
 import importlib.util
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,6 +17,20 @@ THEME = "themes/bettr.json"  # The layout's dark theme.
 REPORTER = "bettr-reporter"
 USAGE = "bettr-usage"
 MODS = (USAGE, "bettr-spaces", "bettr-chrome", "bettr-tabs", REPORTER, "bettr-activity", "bettr-context")
+GENERATED_PANEL = "mod-panel-"  # The blocks bettr-tabs writes into the installed layout: bettr-tabs/panel-mods.js.
+
+
+def same_layout(installed, source):
+    """Whether two layout files say the same, apart from generated panel blocks and formatting."""
+    def strip(node):
+        if isinstance(node, dict):
+            return {key: [strip(child) for child in value if not str(child.get("id", "")).startswith(GENERATED_PANEL)]
+                    if key == "children" else value for key, value in node.items()}
+        return node
+    try:
+        return strip(json.loads(installed)) == strip(json.loads(source))
+    except ValueError:
+        return False
 
 
 def mod_files(mod):
@@ -60,6 +75,8 @@ def main():
                 parser.error(f"{path} is a link; replace it with an installed copy before updating")
         content = source.read_bytes()
         if destination.exists() and destination.read_bytes() == content:
+            continue
+        if relative == LAYOUT and destination.exists() and same_layout(destination.read_bytes(), content):
             continue
         if destination.exists() and not args.update:
             parser.error(f"{destination} differs; review it, then use --update for this package's installation")

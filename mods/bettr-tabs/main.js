@@ -1,6 +1,8 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings } from "herdr";
+import { spaces, panes, run, openOverlay, theme, window, shared, setShared, layout, settings, appHome, readTextFile, writeTextFile, watchFolder } from "herdr";
+import { exists, readdir } from "fs/promises";
+import { blocksDiffer, panelMod, withBlocks } from "./panel-mods.js";
 
 // `color` (#rgb, #rrggbb or #rrggbbaa) at `alpha` (hex 00-ff); any other color as it is.
 // The same helper is in bettr-spaces (a mod cannot import another's files).
@@ -22,14 +24,32 @@ function find(node, id) {
 // The right panel's children, side by side in `panel-body` (a row). Each button shows or
 // hides its own. The first open child takes what is left (weight 1) and the others are
 // fixed (px), so dragging the panel's outer edge resizes only the first. Each child keeps
-// its own width; WIDTH is the width of a child the person never resized.
+// its own width; WIDTH is the width of a child the person never resized. Other mods add
+// their own panels: panel-mods.js.
 const PANELS = ["files", "changes", "activity", "context"], WIDTH = 368;
+const BLOCK_CHECK_MS = 5000, WATCH_RETRY_MS = 30000;
 const gap = () => find(layout(), "panel-body")?.gap ?? 0;
 const same = (a, b) => a.length === b.length && a.every((id, i) => id === b[i]);
 
 export default class Tabs extends View {
-  init() {
+  init(_props, cx) {
     this.pressed = null;
+    this.mods = null; // the mods that ask for a panel; null until a scan of the mods folder works
+    const dir = `${appHome()}/mods`;
+    cx.spawn(async cx => {
+      await this.scanMods(dir, cx);
+      for (;;) {
+        try { await watchFolder(dir); } catch { await cx.sleep(WATCH_RETRY_MS); }
+        await this.scanMods(dir, cx);
+      }
+    });
+    // Not only when mods change: an update of Bettr replaces the layout, and with it the blocks.
+    cx.spawn(async cx => {
+      for (;;) {
+        await this.writeBlocks();
+        await cx.sleep(BLOCK_CHECK_MS);
+      }
+    });
     // Each space's open panels.
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem("panels") ?? "{}") ?? {}; } catch {}
@@ -39,9 +59,48 @@ export default class Tabs extends View {
     try { this.widths = JSON.parse(localStorage.getItem("panelWidths") ?? "{}") ?? {}; } catch {}
   }
 
-  // The open children, in PANELS order: none while the panel is hidden.
+  async scanMods(dir, cx) {
+    try {
+      const found = await Promise.all((await readdir(dir)).map(async name => {
+        const mod = panelMod(name, await readTextFile(`${dir}/${name}/mod.json`).catch(() => null));
+        return mod && { ...mod, icon: await exists(`${dir}/${name}/icon.svg`) ? `mods/${name}/icon.svg` : null };
+      }));
+      const mods = found.filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+      if (JSON.stringify(mods) === JSON.stringify(this.mods)) return;
+      this.mods = mods;
+      setShared("bettr.modPanels", mods.map(({ id, title }) => ({ id, title }))); // for the Layout dialog
+      await this.writeBlocks();
+      cx.notify();
+    } catch {
+      // Not readable now: keep what is known, and leave the layout as it is.
+    }
+  }
+
+  // Make the shown layout's file hold one block per mod. The file, not layout.set: that forgets the sizes the
+  // person dragged, and writes the rest of the tree too. A file that changed since the read is refused: the next check tries again.
+  async writeBlocks() {
+    if (!this.mods || !blocksDiffer(layout(), this.mods)) return;
+    try {
+      const path = `${appHome()}/layouts/${shared("layout")}.json`, text = await readTextFile(path);
+      await writeTextFile(path, `${JSON.stringify(withBlocks(JSON.parse(text), this.mods), null, 2)}\n`, text);
+    } catch {
+      // Tried again at the next check.
+    }
+  }
+
+  // The mods whose block is in the layout now.
+  shownMods(root) {
+    return (this.mods ?? []).filter(mod => find(root, mod.id));
+  }
+
+  // All the panels, in the order they show.
+  panelIds(root) {
+    return [...PANELS, ...this.shownMods(root).map(mod => mod.id)];
+  }
+
+  // The open children, in panel order: none while the panel is hidden.
   opened(root, panel) {
-    return panel && !panel.hidden ? PANELS.filter(id => { const node = find(root, id); return node && !node.hidden; }) : [];
+    return panel && !panel.hidden ? this.panelIds(root).filter(id => { const node = find(root, id); return node && !node.hidden; }) : [];
   }
 
   // Show exactly `want`, and size the panel to fit them. None hides the panel.
@@ -59,9 +118,9 @@ export default class Tabs extends View {
       for (const id of shared) this.widths[id] = Math.max(200, Math.round(rest / shared.length));
       try { localStorage.setItem("panelWidths", JSON.stringify(this.widths)); } catch {}
     }
-    for (const id of PANELS) run(want.includes(id) ? "layout.show" : "layout.hide", { id });
+    for (const id of this.panelIds(layout())) run(want.includes(id) ? "layout.show" : "layout.hide", { id });
     if (!want.length) { run("layout.hide", { id: "panel" }); return; }
-    const width = id => this.widths[id] ?? WIDTH;
+    const width = id => this.widths[id] ?? this.mods?.find(mod => mod.id === id)?.width ?? WIDTH;
     want.forEach((id, i) => run("layout.resize", i ? { id, px: width(id) } : { id, weight: 1 }));
     run("layout.resize", { id: "panel", px: want.reduce((sum, id) => sum + width(id), 0) + between * (want.length - 1) });
     run("layout.show", { id: "panel" });
@@ -83,7 +142,7 @@ export default class Tabs extends View {
       const first = this.space === undefined;
       this.space = space.id; this.pending = null;
       if (!(first && !(space.id in this.panels))) {
-        const want = PANELS.filter(id => (this.panels[space.id] ?? []).includes(id) && enabled.includes(id));
+        const want = this.panelIds(root).filter(id => (this.panels[space.id] ?? []).includes(id) && enabled.includes(id));
         if (!same(want, now)) {
           this.pending = { want, until: Date.now() + 1000 };
           this.setOpen(want, now, panel);
@@ -142,7 +201,11 @@ export default class Tabs extends View {
       : 10;
     const panel = find(root, "panel");
     // Set in the Layout dialog (bettr-chrome/layout-config.js, same default).
-    const enabled = shared("bettr.panels") ?? [...(shared("workspace.panels") ?? ["files", "changes"]), "activity", "context"];
+    // Set in the Layout dialog too: on until turned off, so a new mod's panel needs no setting.
+    const off = shared("bettr.modPanelsOff") ?? [];
+    const mods = this.shownMods(root).filter(mod => !off.includes(mod.id));
+    const enabled = [...(shared("bettr.panels") ?? [...(shared("workspace.panels") ?? ["files", "changes"]), "activity", "context"]),
+      ...mods.map(mod => mod.id)];
     this.syncPanel(space, root, panel, enabled);
     const open = this.opened(root, panel);
     const panelButton = (id, label, icon) => {
@@ -152,8 +215,8 @@ export default class Tabs extends View {
         .tooltip(label).bg(on ? t.selected : t.chrome).text_color(on ? t.foreground : t.muted)
         .hover(s => s.bg(t.hover)).on_mouse_down("left", stop)
         // Each button shows or hides its own panel; the others stay as they are.
-        .on_click(() => this.setOpen(on ? open.filter(p => p !== id) : PANELS.filter(p => p === id || open.includes(p)), open, panel))
-        .child(svg(icon).size(14));
+        .on_click(() => this.setOpen(on ? open.filter(p => p !== id) : this.panelIds(layout()).filter(p => p === id || open.includes(p)), open, panel))
+        .child(icon ? svg(icon).size(14) : div().text_size(12).child(label.slice(0, 1).toUpperCase()));
     };
     return h_flex().size_full().min_w(0).px(10).pl(lightsPadding).pt(8).gap(6).items_center().bg(t.chrome)
       .on_mouse_up("left", () => { this.pressed = null; })
@@ -164,6 +227,7 @@ export default class Tabs extends View {
       .when(enabled.includes("changes"), el => el.child(panelButton("changes", "Changes", "mods/bettr-tabs/icons/git-compare.svg")))
       .when(enabled.includes("activity"), el => el.child(panelButton("activity", "Activity", "mods/bettr-tabs/icons/activity.svg")))
       .when(enabled.includes("context"), el => el.child(panelButton("context", "Context", "mods/bettr-tabs/icons/gauge.svg")))
+      .children(mods.map(mod => panelButton(mod.id, mod.title, mod.icon)))
       .when(w?.buttons, el => el.child(button("minimize", w.platform === "windows" ? svg("mods/tabs/win-min.svg").size(16) : "−", () => run("window.minimize")))
         .child(button("maximize", w.platform === "windows" ? svg(`mods/tabs/${w.maximized ? "win-restore" : "win-max"}.svg`).size(16) : "□", () => run("window.maximize")))
         .child(button("close-window", w.platform === "windows" ? svg("mods/tabs/win-close.svg").size(16) : svg("mods/pane/close.svg").size(13), () => run("window.close"))));

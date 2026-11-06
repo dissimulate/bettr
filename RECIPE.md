@@ -62,6 +62,11 @@ Files, Changes, Activity and Context panels side by side on the right.
 - `panel` → `panel-body` row: `files`, `changes`, `activity` (`bettr-activity`,
   `verbs` prop), `context` (column: `bettr-context`, and `bettr-context` with
   `section: "cache"`).
+- Other mods add their own panel: `"panel": { "width": 900 }` or `"panel": true`
+  in their `mod.json`, with `title` and an optional `icon.svg`. `bettr-tabs`
+  finds them in the mods folder, shows a button and a switch in the Layout
+  dialog, and writes a `mod-panel-<name>` block into the installed layout, so an
+  update that removes it costs nothing: `bettr-tabs/panel-mods.js`.
 - `bettr-spaces`, `bettr-tabs` and `bettr-chrome` are clones of Herdr's
   `spaces`, `tabs` and `workspace-chrome`.
 - `mods/bettr-reporter/` (Python, run by agent hooks) publishes the

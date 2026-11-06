@@ -85,6 +85,39 @@ class InstallTests(unittest.TestCase):
             self.assertEqual(setup.run("status")["state"], "current")
             self.assertFalse((home / ".codex").exists())
 
+    def test_generated_panel_blocks_are_not_a_layout_change(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"HOME": folder}), \
+                redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            target = Path(folder) / "herdr"
+            install_args = ["install.py", "--target", str(target)]
+
+            def installed(*extra):
+                with patch.object(sys, "argv", [*install_args, *extra]):
+                    install.main()
+            installed()
+            layout = target / install.LAYOUT
+
+            def with_child(node_id):
+                tree = json.loads((install.ROOT / install.LAYOUT).read_text())
+                work = next(child for child in tree["children"] if child["id"] == "work")
+                body = next(child for child in work["children"] if child["id"] == "work-body")
+                panel = next(child for child in body["children"] if child["id"] == "panel")
+                panel["children"][0]["children"].append({"id": node_id, "type": "block", "content": {"mod": "x"}})
+                return json.dumps(tree, indent=4)
+            # A generated block, in other formatting: nothing to do, and the block stays.
+            text = with_child(f"{install.GENERATED_PANEL}x")
+            layout.write_text(text)
+            installed()
+            installed("--update")
+            self.assertEqual(layout.read_text(), text)
+            # Any other change is still the person's, and only --update replaces it.
+            layout.write_text(with_child("my-panel"))
+            with self.assertRaises(SystemExit):
+                installed()
+            self.assertIn("my-panel", layout.read_text())
+            installed("--update")
+            self.assertEqual(layout.read_bytes(), (install.ROOT / install.LAYOUT).read_bytes())
+
     def test_invalid_settings_stop_the_install_unchanged(self):
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"HOME": folder}):
             settings = Path(folder) / ".claude/settings.json"
