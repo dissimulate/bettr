@@ -87,7 +87,7 @@ export default class WorkspaceChrome extends View {
       // The name gives way first when the buttons need the room.
       .child(h_flex().flex_1().min_w(0).overflow_hidden().gap(8).items_center().child(image("frame/welcome/herdr.png").size(20).rounded(5)).child(div().font_semibold().text_color(t.foreground).child("Herdr")))
       .child(this.button("search", svg("mods/workspace-chrome/search.svg").size(15), () => run("mod.open", { name: "picker" })))
-      .child(this.button("layout-config", /* the wrench fills more of its box than search */ svg("mods/bettr-chrome/icons/wrench.svg").size(13),
+      .child(this.button("layout-config", svg("mods/bettr-chrome/icons/palette.svg").size(15),
         () => openOverlay({ mod: "bettr-chrome", kind: "dialog", ...layoutSize(), props: { layoutConfig: true } }))
         .tooltip("Layout"))
       // A dot on the gear when an app update is ready.

@@ -13,7 +13,7 @@ Files, Changes, Activity and Context panels side by side on the right.
   (`settings().font_family`). Text sizes 15, 13, 12, 11.
 - **Sidebar**, 268 px, on `chrome`:
   - Top row, 41 px (starts at 76 px on macOS): logo, name, then search, Layout
-    (wrench), Settings (`accent` dot when an update is ready), agent sort.
+    (palette), Settings (`accent` dot when an update is ready), agent sort.
   - Spaces: a 15 px tab-count square and the name, in the space's colour
     (palette of six). Worktrees under their repository. Agents: name, time in
     state, status (spinner, "Needs you" pill, dot, ring). Sub-agents with tree
@@ -22,7 +22,7 @@ Files, Changes, Activity and Context panels side by side on the right.
     reset), percent on the right.
   - Footer, 41 px: `CPU 12%  GPU 3%  RAM 61%`. Over 70% `working`, over 90% `blocked`.
 - **Tab bar**, 41 px: tabs, `+`, panel buttons (Files, Changes, Activity,
-  Context). An open panel's button is on `selected`.
+  Context). An open panel's button looks like the active tab.
 - **Terminals**: 30 px `pane` headers, 10 px corners, 8 px gaps.
 - **Right panel**, hidden until a button opens a panel. Open panels side by
   side, 8 px apart, 368 px each at first (280–1600 px in all).

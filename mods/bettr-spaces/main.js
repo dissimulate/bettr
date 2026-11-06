@@ -258,16 +258,19 @@ export default class Spaces extends View {
     const on = k.address === shown;
     return h_flex()
       .id(`sub-${k.address}`)
-      .pl(indent + 6)
+      // The focused background starts at the space's tab count, with the same rounding.
+      .ml(indent - BADGE - BADGE_GAP)
+      .pl(BADGE + BADGE_GAP + 6)
       .pr(8)
-      .rounded(8)
+      .rounded(4)
       .h(ROW)
       .flex_none()
       .gap(0)
       .items_center()
       .text_size(11)
       .cursor_pointer()
-      // Focused or hovered: brighter text, no background.
+      // Focused: brighter text on a faint background. Hovered: brighter text only.
+      .when(on, el => el.bg(tint(t.raised, "55")))
       .text_color(on ? t.foreground : t.muted)
       .hover((s) => s.text_color(t.foreground))
       .on_click(() => run("terminal.peek", { terminal: k.address }))
@@ -312,17 +315,20 @@ export default class Spaces extends View {
     const when = this.changed[a.address]?.at ?? 0;
     return h_flex()
       .id(`ag-${a.address}`)
-      .pl(indent)
+      // The focused background starts at the space's tab count, with the same rounding.
+      .ml(indent - BADGE - BADGE_GAP)
+      .pl(BADGE + BADGE_GAP)
       .pr(8)
       .h(ROW)
       .flex_none()
-      .rounded(8)
+      .rounded(4)
       .items_center()
       .gap(9)
       // The run time's size; the name is 12, under the space name's 15.
       .text_size(11)
       .cursor_pointer()
-      // Bright only when focused or hovered; the status mark says the rest.
+      // Bright only when focused (on a faint background) or hovered; the status mark says the rest.
+      .when(a.focused, el => el.bg(tint(t.raised, "55")))
       .text_color(a.focused ? t.foreground : t.muted)
       .hover((s) => s.text_color(t.foreground))
       .on_click(() => run("pane.focus", { pane: a.pane }))
@@ -571,13 +577,12 @@ export default class Spaces extends View {
           .gap(9)
           .items_center()
           .when(Boolean(tree), el => el.pl(22).child(svg("mods/workspace-chrome/branch.svg").size(13).text_color(t.dim)))
-          // How many tabs, then the name: for the selected space a tinted fill and border
-          // in the space color; a hovered space's text and border only; grey otherwise.
+          // How many tabs, then the name: a solid fill in the space color for the selected space
+          // (PALETTE is pastel in every theme, so dark digits), a faint tint of it on hover, solid grey otherwise.
           .child(h_flex().flex_1().min_w(0).gap(BADGE_GAP).items_center()
-            .child(mono(div()).flex_none().min_w(BADGE).px(2).h(BADGE).flex().items_center().justify_center().rounded(4).border_1()
-              .when(w.active, el => el.bg(tint(fill, "14")))
-              .border_color(w.active || this.overSpace === w.id ? tint(fill, "99") : t.border).text_size(9).font_black()
-              .text_color(w.active || this.overSpace === w.id ? fill : t.dim)
+            .child(mono(div()).flex_none().min_w(BADGE).px(2).h(BADGE).flex().items_center().justify_center().rounded(4)
+              .bg(w.active ? fill : this.overSpace === w.id ? tint(fill, "33") : t.border).text_size(9).font_black()
+              .text_color(w.active ? "#1a1a1a" : this.overSpace === w.id ? fill : t.muted)
               // Line boxes as tall as their text, so the digits and the name centre on the badge's axis.
               .child(div().line_height("9px").child(String((w.tabs ?? []).length))))
             .child(div().min_w(0).truncate().text_size(15).line_height("15px").text_color(fill).child(w.name))),

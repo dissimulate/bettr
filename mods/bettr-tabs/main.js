@@ -174,13 +174,14 @@ export default class Tabs extends View {
     const stop = (_e, cx) => cx.stop_propagation();
     const button = (id, label, action) => div().id(id).size(26).flex_none().flex().items_center().justify_center().rounded(6).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground))
       .on_mouse_down("left", stop).on_click(action).child(label);
+    // Shared by the tabs and the panel buttons.
+    const chip = (el, on) => el.h(29).flex_none().items_center().rounded(7).border(1).border_color(on ? t.input : t.chrome)
+      .bg(on ? tint(t.raised, "80") : t.chrome).text_color(on ? t.foreground : t.muted).cursor_pointer().hover(s => s.bg(t.hover));
     const ps = panes(); // Read once: each read copies every pane.
     const item = (c, i) => {
       const program = ps.find(p => p.tab === c.id && p.program?.agent)?.program ?? ps.find(p => p.tab === c.id)?.program;
       const name = /^tb\d+$/.test(c.name) ? program?.name ?? "Terminal" : c.name;
-      return h_flex().id(`tab-${c.id}`).h(29).px(10).gap(7).rounded(7).items_center().flex_none().text_size(13)
-        .border(1).border_color(c.active ? t.input : t.chrome).bg(c.active ? tint(t.raised, "80") : t.chrome).text_color(c.active ? t.foreground : t.muted)
-        .hover(s => s.bg(t.hover))
+      return chip(h_flex().id(`tab-${c.id}`).px(10).gap(7).text_size(13), c.active)
         .on_mouse_down("left", (e, cx) => { cx.stop_propagation(); this.pressed = i; if (e.click_count === 2) run("tab.rename", { id: c.id }); })
         .on_mouse_up("left", () => {
           const from = this.pressed; this.pressed = null;
@@ -195,10 +196,12 @@ export default class Tabs extends View {
         .when(c.active, el => el.child(div().id(`close-${c.id}`).text_color(t.dim).on_mouse_down("left", stop).on_click((_e, cx) => { cx.stop_propagation(); run("tab.close", { id: c.id }); }).child(svg("mods/pane/close.svg").size(12))));
     };
     const root = layout(), sidebar = find(root, "sidebar"), w = window();
+    // The first tab starts on the pane's left edge (work-body's padding in the layout).
     // With the sidebar hidden, the tabs start after the macOS window buttons.
+    const paneEdge = find(root, "work-body")?.padding ?? 8;
     const lightsPadding = w?.platform === "macos" && w.titlebar === "none" && !w.fullscreen && root?.traffic_lights
-      ? Math.max(10, (root.traffic_lights[0] + 64) / settings().zoom - (sidebar?.hidden ? 0 : sidebar?.size?.px ?? 0))
-      : 10;
+      ? Math.max(paneEdge, (root.traffic_lights[0] + 64) / settings().zoom - (sidebar?.hidden ? 0 : sidebar?.size?.px ?? 0))
+      : paneEdge;
     const panel = find(root, "panel");
     // Set in the Layout dialog (bettr-chrome/layout-config.js, same default).
     // Set in the Layout dialog too: on until turned off, so a new mod's panel needs no setting.
@@ -211,9 +214,8 @@ export default class Tabs extends View {
     const panelButton = (id, label, icon) => {
       const on = open.includes(id);
       // Icon only; the name is the tooltip.
-      return h_flex().id(`panel-${id}`).size(26).flex_none().items_center().justify_center().rounded(6).border(1).border_color(t.border)
-        .tooltip(label).bg(on ? t.selected : t.chrome).text_color(on ? t.foreground : t.muted)
-        .hover(s => s.bg(t.hover)).on_mouse_down("left", stop)
+      return chip(h_flex().id(`panel-${id}`).w(29).justify_center(), on)
+        .tooltip(label).on_mouse_down("left", stop)
         // Each button shows or hides its own panel; the others stay as they are.
         .on_click(() => this.setOpen(on ? open.filter(p => p !== id) : this.panelIds(layout()).filter(p => p === id || open.includes(p)), open, panel))
         .child(icon ? svg(icon).size(14) : div().text_size(12).child(label.slice(0, 1).toUpperCase()));

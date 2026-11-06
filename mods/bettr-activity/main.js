@@ -21,13 +21,23 @@ const ICONS = {
   Messaged: "message-square", Stopped: "ban", Asked: "message-circle-question-mark", Used: "wrench",
   Proposed: "square-chart-gantt", Staged: "message-square-diff", Committed: "git-commit-vertical",
   Pulled: "arrow-down-to-line", Pushed: "arrow-up-from-line", Tested: "bug", Ran: "terminal", Steered: "user",
+  Notice: "corner-down-right",
 };
 const ICON = 13, ICON_GAP = 6;
 // Detail and note rows start where a step's text does: after the icon.
 const TEXT_START = 14 + ICON + ICON_GAP;
+// A step row is 22 tall and a detail row 18: the difference, under an open section's last detail.
+const DETAIL_END = 2;
 // Step rows (icon and text) a little under the muted colour, so headings and replies lead.
 const STEP = 0.8;
 const icon = verb => `mods/bettr-activity/icons/${ICONS[verb] ?? "wrench"}.svg`;
+// `color` (#rgb, #rrggbb or #rrggbbaa) at `alpha` (hex 00-ff); any other color as it is.
+// The same helper is in bettr-spaces and bettr-tabs (a mod cannot import another's files).
+const tint = (color, alpha) => {
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(color)?.[1];
+  if (!hex) return color;
+  return `#${hex.length === 3 ? [...hex].map((c) => c + c).join("") : hex.slice(0, 6)}${alpha}`;
+};
 
 // One line of text, cut with "…" when it does not fit. The toolkit draws that
 // "…" in the text colour and cannot tell whether a line was cut, so it is not
@@ -129,17 +139,19 @@ export default class Activity extends View {
         .child(div().flex_none().text_size(11).text_color(t[row.tone]).child(row.status));
     }
     if (row.type === "message") {
-      // The agent's text, or a harness notice (dim): full width, no verb. Closed, one line
+      // The agent's text: full width, no verb. Closed, one line
       // cut with "…" (whether it is cut is measured in render()); opened, the agent's Markdown.
       return div().w_full().px(14).py(4).text_size(12).line_height(`${LINE}px`)
-        .text_color(row.notice ? t.dim : t.foreground)
+        .text_color(t.foreground)
         .when(row.expandable, el => el.cursor_pointer())
         .when(row.opened, el => el.child(row.markdown ? TextView.markdown(`md-${row.key}`, row.markdown)
           : v_flex().gap(4).children(row.lines.map(line => marked(line, t)))))
         .when(!row.opened, el => el.child(div().truncate().child(row.preview)));
     }
     if (row.type === "detail") {
-      return h_flex().w_full().h(18).pl(TEXT_START).pr(14).items_center().text_size(11).bg(t.selected)
+      // The last one is taller below its text, so the section has equal space above and below its text.
+      return h_flex().w_full().h(row.last ? 18 + DETAIL_END : 18).when(row.last, el => el.pb(DETAIL_END))
+        .pl(TEXT_START).pr(14).items_center().text_size(11).bg(tint(t.raised, "55"))
         .child(fitted(row.diff ? counted(row.text) : row.text, t.muted));
     }
     if (row.type === "gap") return div().w_full().h(8);
@@ -148,7 +160,8 @@ export default class Activity extends View {
     }
     return h_flex().w_full().h(22).px(14).gap(ICON_GAP).items_center().text_size(12)
       .when(row.expandable, el => el.cursor_pointer())
-      .when(row.opened, el => el.bg(t.selected))
+      // An opened step and its details: the selected agent's background in the sidebar.
+      .when(row.opened, el => el.bg(tint(t.raised, "55")))
       .accessibility_label([row.verb, row.text, row.repeat, row.tail].filter(Boolean).join(", "))
       // The verb is the icon; it stays in the accessibility label.
       // A fixed box, so every icon takes the same width and the texts start in one column.

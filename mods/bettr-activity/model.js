@@ -354,8 +354,9 @@ export function activityRows(state, { now = Date.now() / 1000, names = new Map()
           continue;
         }
         if (step.kind === "notice") {
-          // A harness message that arrived while the agent worked: full width, like the agent's text.
-          blocks.push([{ ...message(key, [`↳ ${noticeTitle(step.entries[0], names) || "Notice"}`]), notice: true }]);
+          // A harness message that arrived while the agent worked: a step row with no details.
+          blocks.push([{ type: "entry", key, verb: "Notice", opened: false, expandable: false,
+            text: noticeTitle(step.entries[0], names) || "Notice" }]);
           continue;
         }
         const line = describe(step.entries, verbs, step);
@@ -363,7 +364,7 @@ export function activityRows(state, { now = Date.now() / 1000, names = new Map()
         blocks.push([{ type: step.kind === "steer" ? "steer" : "entry", key, opened,
           expandable: line.details.length > 0, ...line },
         ...(opened ? line.details.map((detail, at) => ({ type: "detail", key: `${key}:d${at}`, parent: key,
-          text: oneLine(detail), diff: line.diff })) : [])]);
+          text: oneLine(detail), diff: line.diff, last: at === line.details.length - 1 })) : [])]);
       }
       const reply = plainText(turn.reply);
       if (reply.length) blocks.push([message(`${id}:reply`, reply, text(turn.reply))]);

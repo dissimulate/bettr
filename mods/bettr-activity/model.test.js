@@ -136,6 +136,22 @@ test("only working subagents are listed, newest first; bad labels list none", ()
   assert.deepEqual(liveSubagents(withLabel(snapshot([]))), []);
 });
 
+test("a notice is a step row with its own icon verb and nothing to open", () => {
+  const state = activityState(withLabel(snapshot([{ prompt: "t", startedAt: 1, endedAt: 2, outcome: "done",
+    entries: [{ kind: "notice", label: "Background command finished" }] }])));
+  const row = activityRows(state, { now: 9 }).find(item => item.type === "entry");
+  assert.equal(row.verb, "Notice");
+  assert.equal(row.text, "Background command finished");
+  assert.equal(row.expandable, false);
+});
+
+test("only an open step's last detail row is marked last", () => {
+  const state = activityState(withLabel(snapshot([{ prompt: "t", startedAt: 1, endedAt: 2, outcome: "done",
+    entries: [run("ls"), run("pwd")] }])));
+  const details = activityRows(state, { now: 9, open: new Set(["s1#1:0"]) }).filter(row => row.type === "detail");
+  assert.deepEqual(details.map(row => row.last), [false, true]);
+});
+
 test("finished turns are closed, the newest is open, and the person's choice wins", () => {
   const turn = (id, more = {}) => ({ prompt: `t${id}`, startedAt: id, endedAt: id + 1, outcome: "done",
     entries: [run("ls")], ...more });
