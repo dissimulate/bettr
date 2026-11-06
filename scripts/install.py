@@ -16,7 +16,7 @@ LAYOUT = "layouts/bettr.json"
 THEME = "themes/bettr.json"  # The layout's dark theme.
 REPORTER = "bettr-reporter"
 USAGE = "bettr-usage"
-MODS = (USAGE, "bettr-spaces", "bettr-chrome", "bettr-tabs", REPORTER, "bettr-activity", "bettr-context")
+MODS = (USAGE, "bettr-spaces", "bettr-chrome", "bettr-tabs", REPORTER, "bettr-activity", "bettr-context", "bettr-pane", "bettr-files", "bettr-changes")
 GENERATED_PANEL = "mod-panel-"  # The blocks bettr-tabs writes into the installed layout: bettr-tabs/panel-mods.js.
 
 

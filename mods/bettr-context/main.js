@@ -17,7 +17,7 @@ const TOTALS = {
 
 // Cache section heights in px: borders, the header with its bottom line, the list's
 // padding, and one fixed-height line each with GAP between.
-const HEADER = 42, CLOSED = HEADER + 1, PAD = 12, LINE = 24, GAP = 4, UNDER = 6, MAX = 380;
+const HEADER = 36, CLOSED = HEADER + 1, PAD = 12, LINE = 24, GAP = 4, UNDER = 6, MAX = 380;
 
 // Numbers and times use the terminals' font (Herdr's `font_family` setting), else Herdr's
 // default. Read once per render.
@@ -97,7 +97,7 @@ export default class Context extends View {
     const root = v_flex().id("cache").size_full().min_h(0).rounded(10).overflow_hidden()
       .bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(12)
       .child(h_flex().h(HEADER).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
-        .child(div().id("cache-heading").flex_1().text_size(13).font_semibold()
+        .child(div().id("cache-heading").flex_1().text_size(13).font_medium()
           .tooltip("Double-click to fit panel height")
           .on_click(event => { if (event.click_count === 2) this.fit(this.lines, true); })
           .child("Cache"))
@@ -136,8 +136,8 @@ export default class Context extends View {
     const state = contextState(terminal);
     if (props()?.section === "cache") return this.cache(t, state);
     this.showCache(Boolean(terminal));
-    const header = h_flex().h(42).flex_none().px(14).items_center().border_b(1).border_color(t.border)
-      .child(div().font_semibold().child("Context"));
+    const header = h_flex().h(HEADER).flex_none().px(14).items_center().border_b(1).border_color(t.border)
+      .child(div().font_medium().child("Context"));
     const root = v_flex().id("context").size_full().min_h(0).rounded(10).overflow_hidden()
       .bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13).child(header);
     if (!state) {

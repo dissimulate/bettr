@@ -23,13 +23,14 @@ Files, Changes, Activity and Context panels side by side on the right.
   - Footer, 41 px: `CPU 12%  GPU 3%  RAM 61%`. Over 70% `working`, over 90% `blocked`.
 - **Tab bar**, 41 px: tabs, `+`, panel buttons (Files, Changes, Activity,
   Context). An open panel's button looks like the active tab.
-- **Terminals**: 30 px `pane` headers, 10 px corners, 8 px gaps.
+- **Terminals**: 36 px `bettr-pane` headers, 10 px corners, 8 px gaps.
 - **Right panel**, hidden until a button opens a panel. Open panels side by
   side, 8 px apart, 368 px each at first (280–1600 px in all).
-  - Activity: 42 px header. Per turn: 36 px heading (prompt, run time, status),
+  - Every header, on terminals and panels: 36 px, 14 px sides, 13 medium title.
+  - Activity: 36 px header. Per turn: 36 px heading (prompt, run time, status),
     22 px steps (13 px Lucide icon, text, dim count), agent text, final reply.
     Working subagents below, max 200 px.
-  - Context: 42 px header, `N% used`, 5 px bar in seven fixed colours, one 26 px
+  - Context: 36 px header, `N% used`, 5 px bar in seven fixed colours, one 26 px
     row per kind, compaction log. Cache below: hit rate, read, write, rewrite
     and uncached totals, one line per miss.
 
@@ -58,8 +59,9 @@ Files, Changes, Activity and Context panels side by side on the right.
 - Root `row`, with `"theme": { "light": "paper", "dark": "bettr" }`: `sidebar`
   column (`brand` and `sidebar-footer` → `bettr-chrome`, `spaces` →
   `bettr-spaces`, `usage-limits` → `bettr-usage`) and `work` column (`tabs` →
-  `bettr-tabs`, the active tab, `panel`).
-- `panel` → `panel-body` row: `files`, `changes`, `activity` (`bettr-activity`,
+  `bettr-tabs`, the active tab with `bettr-pane` headers, `panel`).
+- `panel` → `panel-body` row: `files` (`bettr-files`), `changes`
+  (`bettr-changes`), `activity` (`bettr-activity`,
   `verbs` prop), `context` (column: `bettr-context`, and `bettr-context` with
   `section: "cache"`).
 - Other mods add their own panel: `"panel": { "width": 900 }` or `"panel": true`

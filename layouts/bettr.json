@@ -94,10 +94,10 @@
                 "pane": {
                   "header": {
                     "content": {
-                      "mod": "pane"
+                      "mod": "bettr-pane"
                     },
                     "reveal": "always",
-                    "height": 30,
+                    "height": 36,
                     "position": "top"
                   },
                   "background": "background",
@@ -128,7 +128,7 @@
                       "id": "files",
                       "type": "block",
                       "content": {
-                        "mod": "files"
+                        "mod": "bettr-files"
                       },
                       "size": {
                         "weight": 1
@@ -139,7 +139,7 @@
                       "id": "changes",
                       "type": "block",
                       "content": {
-                        "mod": "changes"
+                        "mod": "bettr-changes"
                       },
                       "size": {
                         "weight": 1
@@ -260,9 +260,9 @@
                             }
                           },
                           "size": {
-                            "px": 43
+                            "px": 37
                           },
-                          "min": 43
+                          "min": 37
                         }
                       ],
                       "size": {
