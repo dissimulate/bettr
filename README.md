@@ -1,6 +1,6 @@
 # Bettr
 
-A [Herdr](https://herdr.dev) layout built for myself, you can use it if you want.
+A WIP [Herdr](https://herdr.dev) layout built for myself, mainly for use with Claude Code and Codex. Use it if you want.
 
 ![Bettr](preview.png)
 
