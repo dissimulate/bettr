@@ -1,5 +1,5 @@
 {
-  "window": {"width": 1600, "height": 940, "appearance": "dark", "panel": [290, 260]},
+  "window": {"width": 1600, "height": 1000, "appearance": "dark", "panel": [290, 260]},
   "system": {"cpu": 18, "gpu": 7, "used": 21.4, "total": 32},
   "usage": [
     {"agent": "claude", "name": "Claude Code", "windows": [{"label": "Weekly", "used": 61, "resetsIn": 302400}]},

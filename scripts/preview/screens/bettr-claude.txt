@@ -1,10 +1,7 @@
 \e[38;2;78;186;101m⏺\e[0m \e[1mBash\e[0m(python3 scripts/install.py --target /tmp/bettr-k2/app)
   \e[38;2;153;153;153m⎿\e[0m  \e[38;2;153;153;153mInstalled /tmp/bettr-k2/app/layouts/bettr.json\e[0m
      \e[38;2;153;153;153mInstalled /tmp/bettr-k2/app/themes/bettr.json\e[0m
-     \e[38;2;153;153;153mInstalled /tmp/bettr-k2/app/mods/bettr-usage/main.js\e[0m
-     \e[38;2;153;153;153mInstalled /tmp/bettr-k2/app/mods/bettr-spaces/main.js\e[0m
-     \e[38;2;153;153;153mInstalled /tmp/bettr-k2/app/mods/bettr-chrome/main.js\e[0m
-     \e[38;2;153;153;153m… +50 lines (ctrl+o to expand)\e[0m
+     \e[38;2;153;153;153m… +53 lines (ctrl+o to expand)\e[0m
 
 \e[38;2;78;186;101m⏺\e[0m \e[1mBash\e[0m(python3 scripts/preview.py)
   \e[38;2;153;153;153m⎿\e[0m  \e[38;2;153;153;153mapp home   /tmp/bettr-k2/app\e[0m

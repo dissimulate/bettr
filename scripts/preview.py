@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Open Bettr in its own Herdr window, filled with fixed demo data, for preview.png.
 
-Take the screenshot yourself (Cmd-Shift-4, Space, click the window: it keeps the
-window buttons), then quit the window (Cmd-Q) or press Ctrl-C here.
+Take the screenshot yourself (Cmd-Shift-4, Space, Option-click the window: it keeps the
+window buttons and drops the shadow), then quit the window (Cmd-Q) or press Ctrl-C here.
+The window is 16:10, the shape of a card on herdr.dev/gallery. A card crops other shapes.
 
 Edit scripts/preview/demo.json to change what the window shows. The window has its own
 app home, HOME and herdr-core, so it never sees or changes your spaces, machines,
@@ -224,7 +225,7 @@ def main():
         preview.fill()
         preview.age_agents()
         preview.arrange()
-        print("Ready: take the screenshot (Cmd-Shift-4, Space, click the window).")
+        print("Ready: take the screenshot (Cmd-Shift-4, Space, Option-click the window).")
         print("Then quit the window (Cmd-Q) or press Ctrl-C here to clean up.")
         preview.process.wait()
     except KeyboardInterrupt:
