@@ -12,6 +12,11 @@ function location() {
 const key = () => JSON.stringify(location());
 const LANG = { ts: "js", tsx: "js", mts: "js", cts: "js", jsx: "js", mjs: "js", toml: "yaml", jsonc: "json", svelte: "html", vue: "html" };
 const PER_FOLDER = 500, TOTAL = 5000;
+// The folder watch is recursive on macOS and Windows (node_modules, build output, .git), so a
+// burst of changes (a build, an install) makes one refresh after WATCH_DEBOUNCE_MS, not one each.
+// While the watch works, the timer refreshes only every WATCHED_POLL_MS: it still catches what
+// the watch cannot see (a linked worktree's index, a remote machine has no watch).
+const WATCH_DEBOUNCE_MS = 400, POLL_MS = 10000, WATCHED_POLL_MS = 60000;
 
 async function directory(path, on) {
   const windowsDirectory = async () => {
@@ -43,7 +48,9 @@ export default class Files extends View {
     this.saved = new Map();
     this.entries = new Map(); this.folders = new Set(); this.pending = new Set(); this.marks = {};
     this.refresh(cx);
-    cx.timer.every(10000, cx => this.refresh(cx));
+    cx.timer.every(POLL_MS, cx => {
+      if (!this.watched || Date.now() - (this.refreshedAt ?? 0) >= WATCHED_POLL_MS) this.refresh(cx);
+    });
   }
 
   watch(root, cx) {
@@ -51,7 +58,13 @@ export default class Files extends View {
     this.watched = root;
     const context = this.context;
     cx.spawn(async cx => {
-      try { while (this.context === context) { await watchFolder(root); if (this.current(context)) this.refresh(cx); } }
+      try {
+        while (this.context === context) {
+          await watchFolder(root);
+          await cx.sleep(WATCH_DEBOUNCE_MS);
+          if (this.current(context)) this.refresh(cx);
+        }
+      }
       catch { if (this.context === context) this.watched = null; }
     });
   }
@@ -79,9 +92,11 @@ export default class Files extends View {
       this.loading = false;
       if (saved?.file) this.show(saved.file, cx);
     }
-    if (!cwd || this.loading) return;
+    if (!cwd) return;
+    // A change during a refresh may be missed by it: refresh again when it ends.
+    if (this.loading) { this.again = true; return; }
     const context = this.context;
-    this.loading = true;
+    this.loading = true; this.again = false; this.refreshedAt = Date.now();
     this.limited = false;
     cx.spawn(async cx => {
       try {
@@ -102,7 +117,11 @@ export default class Files extends View {
         if (!this.current(context)) return;
         this.marks = marks; this.error = null; this.watch(cwd, cx);
       } catch (e) { if (this.current(context)) this.error = String(e); }
-      finally { if (this.context === context) this.loading = false; cx.notify(); }
+      finally {
+        if (this.context === context) this.loading = false;
+        if (this.again && this.current(context)) this.refresh(cx);
+        cx.notify();
+      }
     });
   }
 

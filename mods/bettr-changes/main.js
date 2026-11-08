@@ -12,6 +12,11 @@ const key = () => JSON.stringify(location());
 // Reads write nothing under .git (no index refresh or lock, no fsmonitor cookie):
 // the folder watch would see it, and every refresh would start the next one.
 const READ = ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "diff.autoRefreshIndex=false"];
+// The folder watch is recursive on macOS and Windows (node_modules, build output, .git), so a
+// burst of changes (a build, an install) makes one refresh after WATCH_DEBOUNCE_MS, not one each.
+// While the watch works, the timer refreshes only every WATCHED_POLL_MS: it still catches what
+// the watch cannot see (a linked worktree's index, a remote machine has no watch).
+const WATCH_DEBOUNCE_MS = 400, POLL_MS = 10000, WATCHED_POLL_MS = 60000;
 const countLines = (text) => text ? text.split("\n").length - Number(text.endsWith("\n")) : 0;
 
 // Numbers each diff line once, so a frame only draws the rows on screen.
@@ -41,7 +46,9 @@ export default class Changes extends View {
     this.input.on("focus", (_e, cx) => { this.typing = true; cx.notify(); });
     this.input.on("blur", (_e, cx) => { this.typing = false; cx.notify(); });
     this.refresh(cx);
-    cx.timer.every(10000, (cx) => this.refresh(cx));
+    cx.timer.every(POLL_MS, (cx) => {
+      if (!this.watched || Date.now() - (this.refreshedAt ?? 0) >= WATCHED_POLL_MS) this.refresh(cx);
+    });
   }
 
   watch(root, cx) {
@@ -51,6 +58,7 @@ export default class Changes extends View {
       try {
         while (this.watched === root) {
           await watchFolder(root);
+          await cx.sleep(WATCH_DEBOUNCE_MS);
           if (this.watched === root) this.refresh(cx);
         }
       } catch { this.watched = null; }
@@ -58,14 +66,16 @@ export default class Changes extends View {
   }
 
   refresh(cx) {
-    if (this.loading || this.busy) return;
+    // A change during a refresh may be missed by it: refresh again when it ends. A commit refreshes when it ends.
+    if (this.loading) { this.again = true; return; }
+    if (this.busy) return;
     const { cwd, on } = location(), context = key();
     if (context !== this.context) {
       this.context = context; this.root = null; this.files = []; this.open = null;
       this.setLines([]); this.message = ""; this.input.set_value(""); this.error = null; this.note = null; this.watched = null; this.closed = false; this.limited = false;
     }
     if (!cwd) return;
-    this.loading = true;
+    this.loading = true; this.again = false; this.refreshedAt = Date.now();
     cx.spawn(async (cx) => {
       try {
         const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, on });
@@ -106,7 +116,11 @@ export default class Changes extends View {
           catch { if (key() === context) this.setLines(["Cannot preview this diff (too large or unreadable)"]); }
         }
       } catch (e) { if (key() === context) this.error = String(e); }
-      finally { this.loading = false; cx.notify(); }
+      finally {
+        this.loading = false;
+        if (this.again) this.refresh(cx);
+        cx.notify();
+      }
     });
   }
 
