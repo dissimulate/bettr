@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { activityRows, activityState, agentNames, describe, focusedAgent, liveSubagents, program, resolve, steps,
-  turnSummary, verbTable } from "./model.js";
+import { activityRows, activityState, agentNames, describe, fixedFailures, focusedAgent, liveSubagents, program, resolve,
+  steps, turnDigest, turnSummary, verbTable } from "./model.js";
 
 // Labels as the reporter writes them: an index of headings, one label per turn.
 function split(state) {
@@ -178,4 +178,60 @@ test("two or more finished turns before the newest fold into one row", () => {
   assert.deepEqual(shown.map(row => row.key).slice(0, 3), ["s1#~older", "s1#1", "s1#2"]);
   // One earlier turn is not folded.
   assert.equal(activityRows(activityState(withLabel(snapshot([turn(1), turn(2)]))), { now: 4 })[0].type, "prompt");
+});
+
+test("a failed command that a later run of the same command passes is fixed", () => {
+  const table = verbTable({ "node --test": "Tested" });
+  const entries = [run("node --test a.js", { result: "failed" }), run("make", { result: "failed" }),
+    run("node --test", { result: "ok" }), run("make -j4", { result: "ok" }), run("ls", { result: "failed" })];
+  const fixed = fixedFailures(entries, table);
+  // The table key joins the two test runs; `make` and `make -j4` are different commands.
+  assert.deepEqual(entries.map(entry => fixed.has(entry)), [true, false, false, false, false]);
+  const tested = describe([entries[0], entries[2]], table, undefined, fixed);
+  assert.deepEqual([tested.tail, tested.tone], ["fixed", "dim"]);
+  assert.match(tested.details[0], /fixed later/);
+  assert.deepEqual(describe([entries[1]], table, undefined, fixed).tail, "failed");
+  // A failure after the passing run is not fixed.
+  const later = [run("pytest", { result: "ok" }), run("pytest", { result: "failed" })];
+  assert.equal(fixedFailures(later).size, 0);
+});
+
+test("a finished turn folds its exploration; a working turn does not", () => {
+  const entries = [{ kind: "read", tool: "Read", items: ["src/a.js", "b.js"] },
+    { kind: "search", tool: "Grep", items: ["foo"], repeat: 2 }, { kind: "web", tool: "WebFetch", label: "x.dev" },
+    { kind: "read", tool: "Read", items: ["src/a.js"] }, run("ls"), { kind: "read", tool: "Read", items: ["c.js"] }];
+  const table = verbTable({ tools: { Read: "Read", Grep: "Searched", WebFetch: "Fetched" } });
+  const rows = turn => activityRows(activityState(withLabel(snapshot([{ prompt: "t", startedAt: 1, entries, ...turn }]))),
+    { now: 9, verbs: table }).filter(row => row.type === "entry");
+  const done = rows({ endedAt: 2, outcome: "done" });
+  assert.deepEqual(done.map(row => row.verb), ["Explored", "Ran", "Read"]);
+  assert.equal(done[0].text, "2 files, 2 searches, 1 web lookup");
+  assert.deepEqual(done[0].details, ["src/a.js", "b.js", "“foo”", "x.dev"]);
+  assert.equal(done[0].key, "s1#1:0");
+  assert.deepEqual(rows({}).map(row => row.verb), ["Read", "Searched", "Fetched", "Read", "Ran", "Read"]);
+});
+
+test("a closed turn's digest has edits, open failures and milestones, else the reply", () => {
+  const table = verbTable({ "git commit": "Committed", "git push": "Pushed", "npm test": "Tested" });
+  const digest = (entries, reply = "") => {
+    const turn = { entries, reply };
+    return turnDigest(turn, steps(entries, table), fixedFailures(entries, table));
+  };
+  const edits = [{ kind: "edit", files: [["src/a.js", 3, 1, "modified"], ["b.js", 2, 0, "created"]] },
+    { kind: "edit", files: [["src/a.js", 1, 1, "modified"]] }];
+  assert.deepEqual(digest([...edits, run("npm test", { result: "failed" }), run("npm test", { result: "ok" }),
+    run("make", { result: "failed" }), run("git commit -m x", { result: "ok" }), run("git push", { result: "failed" })]),
+  [{ text: "2 files +6 −2", diff: true }, { text: "2 failed", tone: "blocked" }, { text: "committed" }]);
+  assert.deepEqual(digest([edits[1]]), [{ text: "a.js +1 −1", diff: true }]);
+  assert.deepEqual(digest([{ kind: "edit", files: [["a", null, null, "modified"]] }]), [{ text: "a", diff: true }]);
+  assert.deepEqual(digest([run("ls")], "## Answer\n\nIt is **fine**."), [{ text: "Answer" }]);
+  assert.deepEqual(digest([]), []);
+  // Shown only on closed, finished turns.
+  const turn = more => activityRows(activityState(withLabel(snapshot([
+    { prompt: "a", startedAt: 1, endedAt: 2, outcome: "done", entries: edits, ...more },
+    { prompt: "b", startedAt: 3, endedAt: 4, outcome: "done", entries: [] }]))), { now: 9 })[0];
+  assert.equal(turn().digest.length, 1);
+  assert.deepEqual(turn().digest, [{ text: "2 files +6 −2", diff: true }]);
+  assert.deepEqual(activityRows(activityState(withLabel(snapshot([{ prompt: "a", startedAt: 1, endedAt: 2,
+    outcome: "done", entries: edits }]))), { now: 9 })[0].digest, []);
 });
