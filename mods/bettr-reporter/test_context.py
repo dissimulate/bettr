@@ -254,6 +254,20 @@ class ContextTests(unittest.TestCase):
         self.assertIsNone(context.update(None, {"session_id": "s1", "transcript_path": self.path + ".gone"}, [],
                                          "claude", report.adapter("claude")))
 
+    def test_a_new_session_without_a_transcript_replaces_the_old_label(self):
+        self.write([assistant([], usage=100)])
+        old = self.run_event(None)
+        later = self.path + ".later"
+        start = [{"type": "session.start"}]
+        state = context.update(old, {"session_id": "s2", "transcript_path": later}, start,
+                               "claude", report.adapter("claude"))
+        value = json.loads(state["label"])
+        self.assertEqual((value["sessionId"], value["used"], value["rows"]), ("s2", 0, []))
+        # The transcript comes after the start; a tool event of the new session reads it.
+        self.path = later
+        self.write([assistant([], usage=300)])
+        self.assertEqual(json.loads(self.run_event(state, session="s2")["label"])["used"], 302)
+
 
 if __name__ == "__main__":
     unittest.main()
