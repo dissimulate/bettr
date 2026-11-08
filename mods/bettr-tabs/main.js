@@ -28,6 +28,8 @@ function find(node, id) {
 // their own panels: panel-mods.js.
 const PANELS = ["files", "changes", "activity", "context"], WIDTH = 368;
 const BLOCK_CHECK_MS = 5000, WATCH_RETRY_MS = 30000;
+// A tab's close slot: the 7px gap before the 12px icon. It slides open when the tab is selected.
+const CLOSE_SLOT = 19, TAB_MOTION = { duration: 160, easing: "ease-out" };
 const gap = () => find(layout(), "panel-body")?.gap ?? 0;
 const same = (a, b) => a.length === b.length && a.every((id, i) => id === b[i]);
 
@@ -175,13 +177,17 @@ export default class Tabs extends View {
     const button = (id, label, action) => div().id(id).size(26).flex_none().flex().items_center().justify_center().rounded(6).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground))
       .on_mouse_down("left", stop).on_click(action).child(label);
     // Shared by the tabs and the panel buttons.
-    const chip = (el, on) => el.h(29).flex_none().items_center().rounded(7).border(1).border_color(on ? t.input : t.chrome)
-      .bg(on ? tint(t.raised, "80") : t.chrome).text_color(on ? t.foreground : t.muted).cursor_pointer().hover(s => s.bg(t.hover));
+    // `outline`: the border even when off (every tab has one; a panel button only when on).
+    // On hover, an outlined chip's border takes the accent colour; any other chip's background changes.
+    const chip = (el, on, outline = false) => el.h(29).flex_none().items_center().rounded(7).border(1)
+      .border_color(on || outline ? t.input : t.chrome)
+      .bg(on ? tint(t.raised, "80") : t.chrome).text_color(on ? t.foreground : t.muted).cursor_pointer()
+      .hover(s => outline ? s.border_color(t.accent) : s.bg(t.hover));
     const ps = panes(); // Read once: each read copies every pane.
     const item = (c, i) => {
       const program = ps.find(p => p.tab === c.id && p.program?.agent)?.program ?? ps.find(p => p.tab === c.id)?.program;
       const name = /^tb\d+$/.test(c.name) ? program?.name ?? "Terminal" : c.name;
-      return chip(h_flex().id(`tab-${c.id}`).px(10).gap(7).text_size(13), c.active)
+      return chip(h_flex().id(`tab-${c.id}`).px(10).text_size(13), c.active, true)
         .on_mouse_down("left", (e, cx) => { cx.stop_propagation(); this.pressed = i; if (e.click_count === 2) run("tab.rename", { id: c.id }); })
         .on_mouse_up("left", () => {
           const from = this.pressed; this.pressed = null;
@@ -189,11 +195,19 @@ export default class Tabs extends View {
           else run("tab.select", { id: c.id });
         })
         .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); openOverlay({ mod: "menu", kind: "popup", width: 200, props: { tab: "tab", target: { id: c.id, space: space.id } } }); })
-        .when(Boolean(program?.icon), el => el.child(program.tint ? svg(program.icon).size(14).text_color(t.muted) : image(program.icon).size(14)))
-        .child(div().max_w(170).truncate().child(c.zoomed ? `${name} Z` : name))
-        .when(c.status === "working", el => el.child(svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)))
-        .when(c.status === "blocked" || c.status === "done", el => el.child(div().size(6).rounded(3).bg(t[c.status])))
-        .when(c.active, el => el.child(div().id(`close-${c.id}`).text_color(t.dim).on_mouse_down("left", stop).on_click((_e, cx) => { cx.stop_propagation(); run("tab.close", { id: c.id }); }).child(svg("mods/pane/close.svg").size(12))));
+        .child(h_flex().min_w(0).gap(7).items_center()
+          .when(Boolean(program?.icon), el => el.child(program.tint ? svg(program.icon).size(14).text_color(t.muted) : image(program.icon).size(14)))
+          .child(div().max_w(170).truncate().child(c.zoomed ? `${name} Z` : name))
+          .when(c.status === "working", el => el.child(svg("mods/workspace-chrome/spinner.svg").size(12).flex_none().text_color(t.working).spin(900)))
+          .when(c.status === "blocked" || c.status === "done", el => el.child(div().size(6).rounded(3).bg(t[c.status]))))
+        // The close button is on the active tab only. Every tab has its slot: the slot's width
+        // (gap and icon, or 0) slides, so the tab grows and shrinks smoothly when selected.
+        .child(div().id(`close-slot-${c.id}`).flex_none().h(12).overflow_hidden()
+          .w(c.active ? CLOSE_SLOT : 0).transition("width", TAB_MOTION)
+          .opacity(c.active ? 1 : 0).transition("opacity", TAB_MOTION)
+          .child(div().id(`close-${c.id}`).flex_none().pl(CLOSE_SLOT - 12).text_color(t.dim)
+            .on_mouse_down("left", stop).on_click((_e, cx) => { cx.stop_propagation(); run("tab.close", { id: c.id }); })
+            .child(svg("mods/pane/close.svg").size(12))));
     };
     const root = layout(), sidebar = find(root, "sidebar"), w = window();
     // The first tab starts on the pane's left edge (work-body's padding in the layout).
