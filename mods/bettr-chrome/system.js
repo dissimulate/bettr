@@ -23,10 +23,10 @@ let macTotal = null, macGpu = null, macSamples = 0;
 
 async function macos() {
   const gpuDue = macSamples++ % GPU_EVERY === 0;
-  const [out, total, gpu] = await Promise.all([sh(MACOS), macTotal === null ? sh(MACOS_TOTAL) : null,
-    gpuDue ? sh(MACOS_GPU) : null]);
-  if (total !== null) macTotal = number(total, /^(\d+)$/m);  // Asked again until it answers.
-  if (gpu !== null) macGpu = number(gpu, /"Device Utilization %"=(\d+)/);
+  // One command at a time: the footer stopped when these ran together in a Promise.all.
+  const out = await sh(MACOS);
+  if (macTotal === null) macTotal = number(await sh(MACOS_TOTAL), /^(\d+)$/m);  // Asked again until it answers.
+  if (gpuDue) macGpu = number(await sh(MACOS_GPU), /"Device Utilization %"=(\d+)/);
   const idle = Number(out.trim().split("\n")[0].trim().split(/\s+/)[2]);
   const page = number(out, /page size of (\d+)/);
   const pages = name => number(out, new RegExp(`${name}:\\s+(\\d+)`)) ?? 0;
