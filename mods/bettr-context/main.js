@@ -71,7 +71,10 @@ export default class Context extends View {
     let previous = null;
     try { previous = localStorage.getItem(key); } catch {}
     const waiting = this.asked && Date.now() < this.asked.until && px !== this.asked.px;
-    if (!force && !waiting && previous !== null && Math.abs((px ?? 0) - Number(previous)) > 1) return;
+    // At its minimum the block is new or reset (a layout install, a changed header height),
+    // not sized by the person: the stored height is old.
+    const manual = previous !== null && Math.abs((px ?? 0) - Number(previous)) > 1 && (px ?? 0) > (node.min ?? CLOSED);
+    if (!force && !waiting && manual) return;
     if (px === want || (waiting && this.asked.px === want)) return;
     try { localStorage.setItem(key, String(want)); } catch {}
     this.asked = { px: want, until: Date.now() + 1000 };
