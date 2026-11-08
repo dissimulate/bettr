@@ -347,10 +347,12 @@ export default class Spaces extends View {
     this.all = terminals();
     this.track(list, now);
     this.hold(list);
+    // Each agent's live sub-agents, found once per render: the sort and the rows both use them.
+    this.subs = new Map(list.map((a) => [a.address, this.tree(this.all, a.address)]));
     // Priority (the default): most urgent first (counting its sub-agents), then most recently
     // changed. "order" keeps tab order. The sort button and its menu are in bettr-chrome.
     if (shared("bettr.agentSort") !== "order") {
-      const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...this.tree(this.all, a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
+      const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...this.subs.get(a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
       const since = (a) => this.changed[a.address]?.at ?? 0;
       list = [...list].sort((x, y) => urgency.get(y.address) - urgency.get(x.address) || since(y) - since(x) || y.seq - x.seq);
     }
@@ -360,14 +362,20 @@ export default class Spaces extends View {
       bySpace.get(a.space).push(a);
     }
     this.bySpace = bySpace;
-    setAgentOrder(rows.flatMap((r) => bySpace.get(r.w.id) ?? []).map((a) => a.address));
+    // Sent only when it changes: render runs on each hover and timer tick.
+    const order = rows.flatMap((r) => bySpace.get(r.w.id) ?? []).map((a) => a.address);
+    if (order.join("\n") !== this.agentOrder) {
+      this.agentOrder = order.join("\n");
+      setAgentOrder(order);
+    }
 
     const ps = panes();
     const tabs = spaces().flatMap((s) => s.tabs ?? []);
-    const label = (a) => {
+    const labels = new Map(list.map((a) => {
       const tab = tabs.find((tab) => tab.id === a.tab);
-      return tab ? title(tab, lead(tab, ps)) : a.title || a.program?.name || "";
-    };
+      return [a.address, tab ? title(tab, lead(tab, ps)) : a.title || a.program?.name || ""];
+    }));
+    const label = (a) => labels.get(a.address);
     const detail = new Map(list.map((a) => [a.address, /^\d+$/.test(label(a)) ? null : label(a)]));
     const seen = {};
     for (const a of list) { const k = `${a.space}\u0000${detail.get(a.address) ?? ""}`; seen[k] = (seen[k] ?? 0) + 1; }
@@ -396,11 +404,10 @@ export default class Spaces extends View {
   // after a worktree's indent and branch glyph (row(): px 8, then 22 + 13, gap 9).
   agentRows({ w, tree }, t) {
     const indent = (tree ? 8 + 22 + 13 + 9 : 8) + BADGE + BADGE_GAP;
-    const all = this.all;
     const shown = focused()?.agent;
     const now = Date.now();
     return (this.bySpace.get(w.id) ?? []).flatMap((a) => {
-      const subs = this.tree(all, a.address);
+      const subs = this.subs.get(a.address) ?? [];
       const r = this.agentRow(t, a, subs, now, indent);
       return this.agentFolded.has(a.address) ? [r] : [r, ...subs.map((s) => this.subRow(t, s, shown, indent))];
     });
