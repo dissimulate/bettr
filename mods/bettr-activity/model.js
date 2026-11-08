@@ -168,7 +168,11 @@ function tally(pairs) {
 
 // Failed commands that a later run of the same command in the turn fixed. The same
 // command: the verb table's key (`pytest`, `git commit`), else the same command text.
+// Kept per entries array and table, as `steps` is.
+const fixes = new WeakMap();
 export function fixedFailures(entries, table = noVerbs) {
+  const known = fixes.get(entries);
+  if (known?.table === table) return known.value;
   const fixed = new Set(), failed = new Map();
   for (const entry of entries) {
     if (entry.kind !== "run") continue;
@@ -179,6 +183,7 @@ export function fixedFailures(entries, table = noVerbs) {
       failed.delete(id);
     }
   }
+  fixes.set(entries, { table, value: fixed });
   return fixed;
 }
 
@@ -311,8 +316,12 @@ const MILESTONES = { Committed: "committed", Pushed: "pushed" };
 
 // What a closed turn did, on one line under its heading: edited files with line
 // counts, failures no later run fixed, commits and pushes. With none of these,
-// the first line of the reply. Parts are { text, tone?, diff? }.
+// the first line of the reply. Parts are { text, tone?, diff? }. A finished turn's
+// entries and reply never change, so the result is kept per entries array, `found` and reply.
+const digests = new WeakMap();
 export function turnDigest(turn, found, fixed) {
+  const known = digests.get(turn.entries);
+  if (known?.found === found && known.reply === turn.reply) return known.value;
   const parts = [];
   const files = mergedFiles(turn.entries.filter(entry => entry.kind === "edit"));
   if (files.length) {
@@ -331,6 +340,7 @@ export function turnDigest(turn, found, fixed) {
     const [first] = plainText(turn.reply);
     if (first) parts.push({ text: first });
   }
+  digests.set(turn.entries, { found, reply: turn.reply, value: parts });
   return parts;
 }
 
@@ -414,14 +424,15 @@ export function activityRows(state, { now = Date.now() / 1000, names = new Map()
       opened: long && open.has(key) };
   };
   // Finished turns before the newest, up to the first working one.
+  const summaries = all.map(turn => turnSummary(turn, now, names));
   let older = 0;
-  while (older < all.length - 1 && !turnSummary(all[older], now, names).live) older += 1;
+  while (older < all.length - 1 && !summaries[older].live) older += 1;
   const olderKey = `${state?.sessionId}#~older`, folded = older >= 2 && !expanded.get(olderKey);
   if (older < 2) older = 0;
   for (const [index, turn] of all.entries()) {
     if (folded && index < older) continue;
     const id = `${state.sessionId}#${turn.id}`;
-    const summary = turnSummary(turn, now, names);
+    const summary = summaries[index];
     const grouped = steps(turn.entries, verbs);
     const found = summary.live ? grouped : explored(grouped);
     const fixed = fixedFailures(turn.entries, verbs);
