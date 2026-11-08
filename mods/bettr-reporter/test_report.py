@@ -261,6 +261,8 @@ class ReporterTests(unittest.TestCase):
             self.assertEqual(terminal, "t1")
             state = json.loads(label.split("=", 1)[1])
             self.assertEqual((state["version"], state["agents"][0]["type"]), (2, "Explore"))
+            # Bytecode goes to the cache, so the next hook does not compile again.
+            self.assertTrue(any((root / ".cache/bettr/pycache").rglob("*.pyc")))
         self.assertEqual(sorted(package.rglob("*")), files)  # No bytecode or other files next to the reporter.
 
 

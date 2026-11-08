@@ -84,7 +84,7 @@ Files, Changes, Activity and Context panels side by side on the right.
   (macOS Keychain, else `.credentials.json`), at most every 2 minutes. Nothing
   else reaches the network.
 - Files outside the mods: agent transcripts (read only), state and usage
-  snapshots in `~/.cache/bettr/`.
+  snapshots, and the reporter's bytecode, in `~/.cache/bettr/`.
 - Shared state: `bettr.panels`, `bettr.agentSort`, `space.colors`. Icons: Lucide
   (ISC) via `scripts/lucide.py`, and Herdr's own.
 
