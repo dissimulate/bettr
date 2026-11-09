@@ -146,23 +146,56 @@
                     },
                     {
                       "id": "changes",
-                      "type": "block",
-                      "content": {
-                        "mod": "bettr-changes",
-                        "props": {
-                          "layoutFramed": true
+                      "type": "column",
+                      "gap": 8,
+                      "children": [
+                        {
+                          "id": "changes-main",
+                          "type": "block",
+                          "content": {
+                            "mod": "bettr-changes",
+                            "props": {
+                              "layoutFramed": true
+                            }
+                          },
+                          "size": {
+                            "weight": 1
+                          },
+                          "min": 120,
+                          "background": "background",
+                          "border": {
+                            "width": 1,
+                            "color": "border"
+                          },
+                          "radius": 10
+                        },
+                        {
+                          "id": "changes-worktrees",
+                          "type": "block",
+                          "content": {
+                            "mod": "bettr-changes",
+                            "props": {
+                              "section": "worktrees",
+                              "autoSize": "changes-worktrees",
+                              "layoutFramed": true
+                            }
+                          },
+                          "size": {
+                            "px": 37
+                          },
+                          "min": 37,
+                          "background": "background",
+                          "border": {
+                            "width": 1,
+                            "color": "border"
+                          },
+                          "radius": 10
                         }
-                      },
+                      ],
                       "size": {
                         "weight": 1
                       },
-                      "hidden": true,
-                      "background": "background",
-                      "border": {
-                        "width": 1,
-                        "color": "border"
-                      },
-                      "radius": 10
+                      "hidden": true
                     },
                     {
                       "id": "activity",

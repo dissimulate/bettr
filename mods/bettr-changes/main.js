@@ -1,6 +1,7 @@
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar, v_virtual_list } from "gpui-base";
-import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, settings } from "herdr";
+import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, settings, props, layout, run } from "herdr";
+import { numstatTotals, parseWorktrees, sizeLabel } from "./worktrees.js";
 
 function location() {
   const space = spaces().find((s) => s.active), f = focused();
@@ -19,6 +20,23 @@ const READ = ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "diff.a
 const WATCH_DEBOUNCE_MS = 400, POLL_MS = 10000, WATCHED_POLL_MS = 60000;
 const countLines = (text) => text ? text.split("\n").length - Number(text.endsWith("\n")) : 0;
 
+// The Worktrees section (the block with `section: "worktrees"`), in px: rows of two fixed-height
+// lines as Activity's subagents, with TREE_PAD above, between and below them. Up to TREE_MAX; more rows scroll.
+const CLOSED = 37, TREE_TOP = 18, TREE_BOTTOM = 16, TREE_ROW = TREE_TOP + 2 + TREE_BOTTOM, TREE_PAD = 10, TREE_MAX = 240;
+// Each refresh runs git in every worktree and reads its new files, so it is slower than Changes' poll.
+// `du` reads every file (node_modules, build output), so a size is measured again only after SIZE_POLL_MS.
+const TREE_POLL_MS = 15000, UNTRACKED_MAX = 200, SIZE_POLL_MS = 300000;
+const sizeKey = (path, on) => `${on ?? ""}\0${path}`;
+
+function find(node, id) {
+  if (node?.id === id) return node;
+  for (const child of node?.children ?? []) {
+    const found = find(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+
 // Numbers each diff line once, so a frame only draws the rows on screen.
 function diffRows(lines) {
   let old = 0, next = 0;
@@ -35,6 +53,7 @@ function diffRows(lines) {
 
 export default class Changes extends View {
   init(_props, cx) {
+    if (props()?.section === "worktrees") return this.initWorktrees(cx);
     this.files = []; this.rows = []; this.diffWidth = 0; this.message = ""; this.handle = cx.focus_handle();
     this.input = InputState.new({ placeholder: "Commit message" });
     this.input.on("change", (_e, cx) => {
@@ -186,7 +205,117 @@ export default class Changes extends View {
       .child(div().flex_1().min_w(0).truncate().child(text));
   }
 
+  initWorktrees(cx) {
+    this.trees = []; this.sizes = new Map();
+    this.refreshWorktrees(cx);
+    cx.timer.every(TREE_POLL_MS, (cx) => { if (!find(layout(), "changes")?.hidden) this.refreshWorktrees(cx); });
+  }
+
+  refreshWorktrees(cx) {
+    if (this.loading) { this.again = true; return; }
+    const { cwd, on } = location(), context = key();
+    this.context = context;
+    if (!cwd) { this.trees = []; return; }
+    this.loading = true; this.again = false;
+    cx.spawn(async (cx) => {
+      try {
+        const list = await exec("git", ["worktree", "list", "--porcelain"], { cwd, on });
+        const trees = [];
+        if (list.code === 0) for (const tree of parseWorktrees(list.stdout)) {
+          trees.push({ ...tree, stat: await this.worktreeStat(tree, on).catch(() => null) });
+          if (key() !== context) return;
+        }
+        if (key() === context) { this.trees = trees; this.on = on; this.measure(trees, on, cx); }
+      } catch { if (key() === context) this.trees = []; }
+      finally {
+        this.loading = false;
+        if (this.again) this.refreshWorktrees(cx);
+        cx.notify();
+      }
+    });
+  }
+
+  // Apart from the refresh, so a slow `du` does not hold back the rows. `du` is missing on
+  // Windows, and it can pass the 30 s limit of exec: then the row shows no size.
+  measure(trees, on, cx) {
+    if (this.measuring) return;
+    const stale = trees.filter((tree) => Date.now() - (this.sizes.get(sizeKey(tree.path, on))?.at ?? 0) >= SIZE_POLL_MS);
+    if (!stale.length) return;
+    this.measuring = true;
+    cx.spawn(async (cx) => {
+      try {
+        for (const { path } of stale) {
+          // du exits non-zero for one unreadable file, and still prints the total.
+          const out = await exec("du", ["-sk", path], { on }).catch(() => null);
+          this.sizes.set(sizeKey(path, on), { label: out ? sizeLabel(out.stdout) : null, at: Date.now() });
+          cx.notify();
+        }
+      } finally { this.measuring = false; }
+    });
+  }
+
+  // The uncommitted lines of one worktree, new files included. Null when git cannot read it.
+  async worktreeStat(tree, on) {
+    const git = (args) => exec("git", [...READ, ...args], { cwd: tree.path, on });
+    const diff = await git(["diff", tree.unborn ? "--cached" : "HEAD", "--numstat", "-z", "--no-renames"]);
+    const others = await git(["ls-files", "--others", "--exclude-standard", "-z"]);
+    if (diff.code !== 0 || others.code !== 0) return null;
+    const stat = numstatTotals(diff.stdout);
+    // A nested repository or worktree is one entry that ends in "/": it is not this worktree's file.
+    for (const path of others.stdout.split("\0").filter((p) => p && !p.endsWith("/")).slice(0, UNTRACKED_MAX)) {
+      stat.dirty = true;
+      const text = await readTextFile(`${tree.path}/${path}`, { on }).catch(() => null);
+      if (text && !text.includes("\0")) stat.add += countLines(text);
+    }
+    return stat;
+  }
+
+  // As the Cache section: the block fits its rows. After a manual resize the size is the
+  // person's until the heading is double-clicked.
+  fit(rows, force = false) {
+    const id = props()?.autoSize, node = id ? find(layout(), id) : null;
+    if (!node) return;
+    const want = rows ? Math.min(TREE_MAX, CLOSED + rows * TREE_ROW + (rows + 1) * TREE_PAD) : CLOSED;
+    const px = node.size?.px, storeKey = `autoHeight:${id}`;
+    let previous = null;
+    try { previous = localStorage.getItem(storeKey); } catch {}
+    const waiting = this.asked && Date.now() < this.asked.until && px !== this.asked.px;
+    const manual = previous !== null && Math.abs((px ?? 0) - Number(previous)) > 1 && (px ?? 0) > (node.min ?? CLOSED);
+    if (!force && !waiting && manual) return;
+    if (px === want || (waiting && this.asked.px === want)) return;
+    try { localStorage.setItem(storeKey, String(want)); } catch {}
+    this.asked = { px: want, until: Date.now() + 1000 };
+    run("layout.resize", { id, px: want });
+  }
+
+  worktrees(cx) {
+    if (key() !== this.context) this.refreshWorktrees(cx);
+    const t = theme(), trees = this.trees;
+    this.fit(trees.length);
+    const root = v_flex().id("worktrees").size_full().min_h(0).overflow_hidden().text_color(t.foreground).text_size(12)
+      .child(h_flex().h(36).flex_none().px(14).items_center().border_b(1).border_color(t.border)
+        .child(div().id("worktrees-heading").flex_1().text_size(13).font_medium()
+          .tooltip("Double-click to fit panel height")
+          .on_click((event) => { if (event.click_count === 2) this.fit(this.trees.length, true); })
+          .child("Worktrees")));
+    if (!trees.length) return root;
+    return root.child(v_flex().id("worktrees-list").flex_1().min_h(0).overflow_y_scrollbar().px(14).py(TREE_PAD).gap(TREE_PAD)
+      .children(trees.map((tree) => v_flex().id(`worktree-${tree.path}`).h(TREE_ROW).flex_none().gap(2)
+        .child(h_flex().h(TREE_TOP).w_full().min_w(0).gap(6).items_center()
+          .child(div().id(`worktree-name-${tree.path}`).min_w(0).truncate().font_medium().tooltip(tree.path).child(tree.name))
+          .child(div().flex_1())
+          .child(div().min_w(0).truncate().text_size(11).text_color(t.muted).child(tree.branch)))
+        .child(h_flex().h(TREE_BOTTOM).w_full().min_w(0).gap(6).items_center().text_size(11)
+          .when(!tree.stat?.dirty, (el) => el.text_color(t.dim).child(tree.stat ? "No changes" : "Cannot read changes"))
+          .when(Boolean(tree.stat?.dirty), (el) => el
+            .child(div().text_color(t.ansi2).child(`+${tree.stat.add}`))
+            .child(div().text_color(t.ansi1).child(`−${tree.stat.del}`)))
+          .child(div().flex_1())
+          .child(div().flex_none().text_color(t.dim).child(this.sizes.get(sizeKey(tree.path, this.on))?.label ?? ""))))));
+  }
+
   render(cx) {
+    if (props()?.section === "worktrees") return this.worktrees(cx);
     if (key() !== this.context) this.refresh(cx);
     const t = theme(), add = this.files.reduce((n, f) => n + f.add, 0), del = this.files.reduce((n, f) => n + f.del, 0);
     const enabled = Boolean(this.message.trim() && this.root && !this.busy && !this.loading);

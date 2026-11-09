@@ -30,6 +30,9 @@ Files, Changes, Activity and Context panels side by side on the right.
   - Activity: 36 px header. Per turn: 36 px heading (prompt, run time, status),
     22 px steps (13 px Lucide icon, text, dim count), agent text, final reply.
     Working subagents below, max 200 px.
+  - Changes: file list, diff, commit box. Worktrees below, max 240 px: one
+    two-line row per worktree: folder and right-aligned branch, then green and
+    red line counts and the size in MB at the right.
   - Context: 36 px header, `N% used`, 5 px bar in seven fixed colours, one 26 px
     row per kind, compaction log. Cache below: hit rate, read, write, rewrite
     and uncached totals, one line per miss.
@@ -53,6 +56,8 @@ Files, Changes, Activity and Context panels side by side on the right.
 - Context: click Messages, Tools, Skills or Custom agents for their parts.
   Cache fits its lines (double-click its heading to fit again), and hides when no
   agent is focused.
+- Worktrees lists every worktree of the focused repo (`git worktree list`), and
+  fits its rows the same way. Line counts include new files.
 
 ## Built from
 
@@ -61,7 +66,8 @@ Files, Changes, Activity and Context panels side by side on the right.
   `bettr-spaces`, `usage-limits` → `bettr-usage`) and `work` column (`tabs` →
   `bettr-tabs`, the active tab with `bettr-pane` headers, `panel`).
 - `panel` → `panel-body` row: `files` (`bettr-files`), `changes`
-  (`bettr-changes`), `activity` (`bettr-activity`,
+  (column: `bettr-changes`, and `bettr-changes` with `section: "worktrees"`),
+  `activity` (`bettr-activity`,
   `verbs` prop), `context` (column: `bettr-context`, and `bettr-context` with
   `section: "cache"`).
 - Other mods add their own panel: `"panel": { "width": 900 }` or `"panel": true`
