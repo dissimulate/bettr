@@ -36,6 +36,24 @@ def same_layout(installed, source):
         return False
 
 
+def keep_generated_panels(installed, source):
+    """`source`, with the generated panel blocks of `installed` added to its panel-body."""
+    def body(node):
+        if node.get("id") == "panel-body":
+            return node
+        return next((found for child in node.get("children", []) if (found := body(child))), None)
+    try:
+        tree = json.loads(source)
+        old, new = body(json.loads(installed)), body(tree)
+    except ValueError:
+        return source
+    kept = [child for child in (old or {}).get("children", []) if str(child.get("id", "")).startswith(GENERATED_PANEL)]
+    if not kept or new is None:
+        return source
+    new.setdefault("children", []).extend(kept)
+    return f"{json.dumps(tree, indent=2, ensure_ascii=False)}\n".encode()
+
+
 def mod_files(mod):
     """A mod's files to install, relative to the repository. `setup.SKIP` leaves out tests and docs."""
     return [f"mods/{mod}/{name}" for name in setup.package_files(ROOT / "mods" / mod)]
@@ -83,6 +101,8 @@ def main():
             continue
         if destination.exists() and not args.update:
             parser.error(f"{destination} differs; review it, then use --update for this package's installation")
+        if relative == LAYOUT and destination.exists():
+            content = keep_generated_panels(destination.read_bytes(), content)
         writes.append((destination, content))
 
     if args.hooks:

@@ -49,7 +49,7 @@ export default class Tabs extends View {
         await this.scanMods(dir, cx);
       }
     });
-    // Not only when mods change: an update of Bettr replaces the layout, and with it the blocks.
+    // Not only when mods change: a layout reset removes the blocks.
     cx.spawn(async cx => {
       for (;;) {
         await this.writeBlocks();

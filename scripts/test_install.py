@@ -97,12 +97,13 @@ class InstallTests(unittest.TestCase):
             installed()
             layout = target / install.LAYOUT
 
-            def with_child(node_id, reverse=False):
+            def with_child(*node_ids, reverse=False):
                 tree = json.loads((install.ROOT / install.LAYOUT).read_text())
                 work = next(child for child in tree["children"] if child["id"] == "work")
                 body = next(child for child in work["children"] if child["id"] == "work-body")
                 panel = next(child for child in body["children"] if child["id"] == "panel")
-                panel["children"][0]["children"].append({"id": node_id, "type": "block", "content": {"mod": "x"}})
+                for node_id in node_ids:
+                    panel["children"][0]["children"].append({"id": node_id, "type": "block", "content": {"mod": "x"}})
                 if reverse:
                     panel["children"][0]["children"].reverse()
                 return json.dumps(tree, indent=4)
@@ -125,6 +126,12 @@ class InstallTests(unittest.TestCase):
             self.assertIn("my-panel", layout.read_text())
             installed("--update")
             self.assertEqual(layout.read_bytes(), (install.ROOT / install.LAYOUT).read_bytes())
+            # --update replaces the person's change and keeps the generated block.
+            layout.write_text(with_child("my-panel", f"{install.GENERATED_PANEL}x"))
+            installed("--update")
+            self.assertNotIn("my-panel", layout.read_text())
+            self.assertIn(f"{install.GENERATED_PANEL}x", layout.read_text())
+            self.assertTrue(install.same_layout(layout.read_bytes(), (install.ROOT / install.LAYOUT).read_bytes()))
 
     def test_invalid_settings_stop_the_install_unchanged(self):
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"HOME": folder}):
