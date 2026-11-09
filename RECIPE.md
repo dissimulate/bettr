@@ -15,7 +15,7 @@ Files, Changes, Activity and Context panels side by side on the right.
   - Top row, 41 px (starts at 76 px on macOS): logo, name, then search, Layout
     (palette), Settings (`accent` dot when an update is ready), agent sort.
   - Spaces: a 15 px tab-count square and the name, in the space's colour
-    (palette of six). Worktrees under their repository. Agents: name, time in
+    (palette of six). Agents: name, time in
     state, status (spinner, "Needs you" pill, dot, ring). Sub-agents with tree
     lines. One header per connected machine.
   - Usage, max 400 px: one 5 px bar per quota window, `muted` (`dim` after
