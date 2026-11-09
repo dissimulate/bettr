@@ -61,3 +61,16 @@ Usage bars show this computer's agents only.
   model, effort, times and task.
 
 [`RECIPE.md`](RECIPE.md) is the build brief for the [Herdr gallery](https://herdr.dev/layouts/).
+
+## Panel frames
+
+Bettr draws the outer frame of every mod block under `panel-body`, including added
+panels such as Org and Tracker. `PANEL_FRAME` in `mods/bettr-tabs/panel-mods.js`
+sets the background theme token, border, and corner radius in one place. The panel
+registry applies those native layout fields to existing and new blocks, including
+Context and Cache, while keeping sizes, visibility, and other mod props.
+
+Panel mods receive `layoutFramed: true` in their props. They should leave their
+outer surface transparent and omit their own outer border and radius. Internal
+headers, controls, and scroll areas remain the mod's responsibility. Bettr's own
+panel mods draw only their contents. Other layouts can supply their own frames.

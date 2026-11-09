@@ -128,23 +128,41 @@
                       "id": "files",
                       "type": "block",
                       "content": {
-                        "mod": "bettr-files"
+                        "mod": "bettr-files",
+                        "props": {
+                          "layoutFramed": true
+                        }
                       },
                       "size": {
                         "weight": 1
                       },
-                      "hidden": true
+                      "hidden": true,
+                      "background": "background",
+                      "border": {
+                        "width": 1,
+                        "color": "border"
+                      },
+                      "radius": 10
                     },
                     {
                       "id": "changes",
                       "type": "block",
                       "content": {
-                        "mod": "bettr-changes"
+                        "mod": "bettr-changes",
+                        "props": {
+                          "layoutFramed": true
+                        }
                       },
                       "size": {
                         "weight": 1
                       },
-                      "hidden": true
+                      "hidden": true,
+                      "background": "background",
+                      "border": {
+                        "width": 1,
+                        "color": "border"
+                      },
+                      "radius": 10
                     },
                     {
                       "id": "activity",
@@ -222,13 +240,20 @@
                               "python3 -m unittest": "Tested",
                               "sleep": null
                             }
-                          }
+                          },
+                          "layoutFramed": true
                         }
                       },
                       "size": {
                         "weight": 1
                       },
-                      "hidden": true
+                      "hidden": true,
+                      "background": "background",
+                      "border": {
+                        "width": 1,
+                        "color": "border"
+                      },
+                      "radius": 10
                     },
                     {
                       "id": "context",
@@ -241,13 +266,20 @@
                           "content": {
                             "mod": "bettr-context",
                             "props": {
-                              "cache": "context-cache"
+                              "cache": "context-cache",
+                              "layoutFramed": true
                             }
                           },
                           "size": {
                             "weight": 1
                           },
-                          "min": 120
+                          "min": 120,
+                          "background": "background",
+                          "border": {
+                            "width": 1,
+                            "color": "border"
+                          },
+                          "radius": 10
                         },
                         {
                           "id": "context-cache",
@@ -256,13 +288,20 @@
                             "mod": "bettr-context",
                             "props": {
                               "section": "cache",
-                              "autoSize": "context-cache"
+                              "autoSize": "context-cache",
+                              "layoutFramed": true
                             }
                           },
                           "size": {
                             "px": 37
                           },
-                          "min": 37
+                          "min": 37,
+                          "background": "background",
+                          "border": {
+                            "width": 1,
+                            "color": "border"
+                          },
+                          "radius": 10
                         }
                       ],
                       "size": {

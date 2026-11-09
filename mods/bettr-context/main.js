@@ -97,8 +97,8 @@ export default class Context extends View {
     const lines = view ? 1 + view.misses.length : 0;
     this.lines = lines;
     this.fit(lines);
-    const root = v_flex().id("cache").size_full().min_h(0).rounded(10).overflow_hidden()
-      .bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(12)
+    const root = v_flex().id("cache").size_full().min_h(0).overflow_hidden()
+      .text_color(t.foreground).text_size(12)
       .child(h_flex().h(HEADER).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
         .child(div().id("cache-heading").flex_1().text_size(13).font_medium()
           .tooltip("Double-click to fit panel height")
@@ -141,8 +141,8 @@ export default class Context extends View {
     this.showCache(Boolean(terminal));
     const header = h_flex().h(HEADER).flex_none().px(14).items_center().border_b(1).border_color(t.border)
       .child(div().font_medium().child("Context"));
-    const root = v_flex().id("context").size_full().min_h(0).rounded(10).overflow_hidden()
-      .bg(t.background).border_1().border_color(t.border).text_color(t.foreground).text_size(13).child(header);
+    const root = v_flex().id("context").size_full().min_h(0).overflow_hidden()
+      .text_color(t.foreground).text_size(13).child(header);
     if (!state) {
       return root.child(v_flex().p(14).text_size(12).text_color(t.dim).child("Focus an agent to see its context"));
     }
