@@ -2,7 +2,7 @@ import { View, div, svg, image } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { spaces, panes, run, openOverlay, theme, window, shared, setShared, layout, settings, appHome, readTextFile, writeTextFile, watchFolder } from "herdr";
 import { exists, readdir } from "fs/promises";
-import { blocksDiffer, panelMod, withBlocks } from "./panel-mods.js";
+import { blocksDiffer, orderedPanels, panelMod, withBlocks } from "./panel-mods.js";
 
 // `color` (#rgb, #rrggbb or #rrggbbaa) at `alpha` (hex 00-ff); any other color as it is.
 // The same helper is in bettr-spaces (a mod cannot import another's files).
@@ -25,8 +25,12 @@ function find(node, id) {
 // hides its own. The first open child takes what is left (weight 1) and the others are
 // fixed (px), so dragging the panel's outer edge resizes only the first. Each child keeps
 // its own width; WIDTH is the width of a child the person never resized. Other mods add
-// their own panels: panel-mods.js.
-const PANELS = ["files", "changes", "activity", "context"], WIDTH = 368;
+// their own panels: panel-mods.js. The Layout dialog sets their order: shared "bettr.panelOrder".
+const ICONS = "mods/bettr-tabs/icons";
+const PANEL_BUTTONS = { files: ["Files", `${ICONS}/list-tree.svg`], changes: ["Changes", `${ICONS}/git-compare.svg`],
+  activity: ["Activity", `${ICONS}/activity.svg`], context: ["Context", `${ICONS}/gauge.svg`] };
+const PANELS = Object.keys(PANEL_BUTTONS), WIDTH = 368;
+const panelOrder = () => shared("bettr.panelOrder") ?? [];
 const BLOCK_CHECK_MS = 5000, WATCH_RETRY_MS = 30000;
 // A tab's close slot: the 7px gap before the 12px icon. It slides open when the tab is selected.
 const CLOSE_SLOT = 19, TAB_MOTION = { duration: 160, easing: "ease-out" };
@@ -81,10 +85,10 @@ export default class Tabs extends View {
   // Make the shown layout's file hold one block per mod. The file, not layout.set: that forgets the sizes the
   // person dragged, and writes the rest of the tree too. A file that changed since the read is refused: the next check tries again.
   async writeBlocks() {
-    if (!this.mods || !blocksDiffer(layout(), this.mods)) return;
+    if (!this.mods || !blocksDiffer(layout(), this.mods, panelOrder())) return;
     try {
       const path = `${appHome()}/layouts/${shared("layout")}.json`, text = await readTextFile(path);
-      await writeTextFile(path, `${JSON.stringify(withBlocks(JSON.parse(text), this.mods), null, 2)}\n`, text);
+      await writeTextFile(path, `${JSON.stringify(withBlocks(JSON.parse(text), this.mods, panelOrder()), null, 2)}\n`, text);
     } catch {
       // Tried again at the next check.
     }
@@ -97,7 +101,7 @@ export default class Tabs extends View {
 
   // All the panels, in the order they show.
   panelIds(root) {
-    return [...PANELS, ...this.shownMods(root).map(mod => mod.id)];
+    return orderedPanels(root, [...PANELS, ...this.shownMods(root).map(mod => mod.id)]);
   }
 
   // The open children, in panel order: none while the panel is hidden.
@@ -217,6 +221,9 @@ export default class Tabs extends View {
       ? Math.max(paneEdge, (root.traffic_lights[0] + 64) / settings().zoom - (sidebar?.hidden ? 0 : sidebar?.size?.px ?? 0))
       : paneEdge;
     const panel = find(root, "panel");
+    // A new order from the Layout dialog applies now, not at the next block check.
+    const order = JSON.stringify(panelOrder());
+    if (order !== this.order) { this.order = order; this.writeBlocks(); }
     // Set in the Layout dialog (bettr-chrome/layout-config.js, same default).
     // Set in the Layout dialog too: on until turned off, so a new mod's panel needs no setting.
     const off = shared("bettr.modPanelsOff") ?? [];
@@ -239,11 +246,10 @@ export default class Tabs extends View {
       .on_scroll_wheel(e => { if (Math.abs(e.delta.y) >= 1) run(e.delta.y > 0 ? "tab.prev" : "tab.next"); })
       .child(h_flex().id("tab-scroll").flex_1().min_w(0).h_full().items_center().gap(3).overflow_x_scrollbar().children(shown.map(item)))
       .child(button("tab-new", "+", () => openOverlay({ mod: "new-menu", kind: "popup", width: 250, height: 512 })))
-      .when(enabled.includes("files"), el => el.child(panelButton("files", "Files", "mods/bettr-tabs/icons/list-tree.svg")))
-      .when(enabled.includes("changes"), el => el.child(panelButton("changes", "Changes", "mods/bettr-tabs/icons/git-compare.svg")))
-      .when(enabled.includes("activity"), el => el.child(panelButton("activity", "Activity", "mods/bettr-tabs/icons/activity.svg")))
-      .when(enabled.includes("context"), el => el.child(panelButton("context", "Context", "mods/bettr-tabs/icons/gauge.svg")))
-      .children(mods.map(mod => panelButton(mod.id, mod.title, mod.icon)))
+      .children(this.panelIds(root).filter(id => enabled.includes(id)).map(id => {
+        const mod = mods.find(m => m.id === id);
+        return mod ? panelButton(id, mod.title, mod.icon) : panelButton(id, ...PANEL_BUTTONS[id]);
+      }))
       .when(w?.buttons, el => el.child(button("minimize", w.platform === "windows" ? svg("mods/tabs/win-min.svg").size(16) : "−", () => run("window.minimize")))
         .child(button("maximize", w.platform === "windows" ? svg(`mods/tabs/${w.maximized ? "win-restore" : "win-max"}.svg`).size(16) : "□", () => run("window.maximize")))
         .child(button("close-window", w.platform === "windows" ? svg("mods/tabs/win-close.svg").size(16) : svg("mods/pane/close.svg").size(13), () => run("window.close"))));

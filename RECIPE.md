@@ -44,7 +44,7 @@ Files, Changes, Activity and Context panels side by side on the right.
 - Usage: click a row to refresh. Hover a bar for reset time and age.
 - Panel buttons toggle their own panel. Each space remembers its panels. The
   outer edge resizes the first open panel. The Layout dialog turns each button
-  and the usage bars on or off.
+  and the usage bars on or off, and its arrows set the panel order.
 - Activity and Context follow the focused agent.
 - Activity: newest turn open, older turns one row. Two or more older finished
   turns fold behind "Show N turns". Click a step for details, a cut message to
@@ -85,7 +85,7 @@ Files, Changes, Activity and Context panels side by side on the right.
   else reaches the network.
 - Files outside the mods: agent transcripts (read only), state and usage
   snapshots, and the reporter's bytecode, in `~/.cache/bettr/`.
-- Shared state: `bettr.panels`, `bettr.agentSort`, `space.colors`. Icons: Lucide
+- Shared state: `bettr.panels`, `bettr.panelOrder`, `bettr.agentSort`, `space.colors`. Icons: Lucide
   (ISC) via `scripts/lucide.py`, and Herdr's own.
 
 ## Watch out

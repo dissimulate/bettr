@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { GENERATED, PANEL_FRAME, blocksDiffer, panelMod, withBlocks } from "./panel-mods.js";
+import { GENERATED, PANEL_FRAME, blocksDiffer, orderedPanels, panelMod, withBlocks } from "./panel-mods.js";
 
 const tree = (...extra) => ({ id: "root", type: "row", children: [
   { id: "panel-body", type: "row", children: [{ id: "files", type: "block", content: { mod: "files" } }, ...extra] },
@@ -34,6 +34,30 @@ test("a removed mod's block goes, and the person's own blocks and a kept block's
   withBlocks(t, [tracker]);
   assert.deepEqual(body(t), ["files", tracker.id, "my-panel"]);
   assert.deepEqual(t.children[0].children[1], kept);
+});
+
+test("the saved order moves the panels it names, and the person's own blocks keep their slots", () => {
+  const block = id => ({ id, type: "block", content: { mod: id }, size: { px: 400 } });
+  const t = withBlocks(tree(block("changes"), block("mine"), block("activity")), []);
+  const order = ["activity", "changes", "files"];
+  assert.equal(blocksDiffer(t, [], order), true);
+  withBlocks(t, [], order);
+  assert.deepEqual(t.children[0].children.map(node => node.id), ["activity", "changes", "mine", "files"]);
+  assert.equal(t.children[0].children[0].size.px, 400);
+  assert.equal(blocksDiffer(t, [], order), false);
+});
+
+test("a mod with no saved position goes last, and a saved position brings it back", () => {
+  const t = withBlocks(tree(), [tracker], ["ghost", "files"]);
+  assert.deepEqual(t.children[0].children.map(node => node.id), ["files", tracker.id]);
+  withBlocks(t, [tracker], [tracker.id, "files"]);
+  assert.deepEqual(t.children[0].children.map(node => node.id), [tracker.id, "files"]);
+});
+
+test("panels list in the order the layout shows, and one with no node goes last", () => {
+  const t = withBlocks(tree(), [tracker], [tracker.id, "files"]);
+  assert.deepEqual(orderedPanels(t, ["files", "changes", tracker.id]), [tracker.id, "files", "changes"]);
+  assert.deepEqual(orderedPanels({ id: "root" }, ["files", "changes"]), ["files", "changes"]);
 });
 
 test("a layout with no panel-body is left alone", () => {

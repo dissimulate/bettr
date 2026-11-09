@@ -21,11 +21,14 @@ GENERATED_PANEL = "mod-panel-"  # The blocks bettr-tabs writes into the installe
 
 
 def same_layout(installed, source):
-    """Whether two layout files say the same, apart from generated panel blocks and formatting."""
+    """Whether two layout files say the same, apart from generated panel blocks, panel order and formatting."""
     def strip(node):
         if isinstance(node, dict):
-            return {key: [strip(child) for child in value if not str(child.get("id", "")).startswith(GENERATED_PANEL)]
-                    if key == "children" else value for key, value in node.items()}
+            stripped = {key: [strip(child) for child in value if not str(child.get("id", "")).startswith(GENERATED_PANEL)]
+                        if key == "children" else value for key, value in node.items()}
+            if node.get("id") == "panel-body" and "children" in stripped:  # The Layout dialog sets this order.
+                stripped["children"].sort(key=lambda child: str(child.get("id", "")))
+            return stripped
         return node
     try:
         return strip(json.loads(installed)) == strip(json.loads(source))
