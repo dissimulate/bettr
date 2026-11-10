@@ -28,6 +28,13 @@ const tint = (color, alpha) => {
   return `#${hex.length === 3 ? [...hex].map((c) => c + c).join("") : hex.slice(0, 6)}${alpha}`;
 };
 
+// Stored JSON, or `fallback` when it is missing or damaged. A full or blocked store loses only the save.
+const stored = (key, fallback) => {
+  try { return JSON.parse(localStorage.getItem(key) ?? "null") ?? fallback; } catch { return fallback; }
+};
+const store = (key, text) => { try { localStorage.setItem(key, text); } catch {} };
+const record = (value) => (value && typeof value === "object" && !Array.isArray(value) ? value : {});
+
 // Agent rows, from the former Agents panel.
 const clean = (s) => (s ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
 
@@ -69,12 +76,14 @@ export default class Spaces extends View {
     this.pressed = null;
     this.over = null;
     this.machines = [];
-    this.reconnecting = JSON.parse(localStorage.getItem("machines.reconnecting") ?? "{}");
+    this.reconnecting = Object.fromEntries(Object.entries(record(stored("machines.reconnecting", {})))
+      .filter(([, state]) => record(state) === state));
     for (const state of Object.values(this.reconnecting)) state.busy = false;
-    this.folded = new Set(JSON.parse(localStorage.getItem("machines.folded") ?? "[]"));
+    const folded = stored("machines.folded", []);
+    this.folded = new Set(Array.isArray(folded) ? folded : []);
     this.agentFolded = new Set(); // agents whose sub-agents are hidden
     // Each agent's last state and when it changed (ms), kept across restarts.
-    this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
+    this.changed = record(stored("changed", {}));
     // Redraw the time each agent has been in its state (minutes).
     cx.timer.every(30000, (cx) => cx.notify());
     this.refreshMachines(cx);
@@ -83,8 +92,15 @@ export default class Spaces extends View {
 
   refreshMachines(cx) {
     cx.spawn(async cx => {
-      try { const r = await hc(["machine", "ls", "--json"]); if (r.code === 0) this.machines = (JSON.parse(r.stdout).machines ?? []).filter((m) => !m.temporary); } catch {}
-      cx.notify();
+      try {
+        const r = await hc(["machine", "ls", "--json"]);
+        if (r.code !== 0) return;
+        // Asked every 15 s: redraw only when the answer changes.
+        const machines = (JSON.parse(r.stdout).machines ?? []).filter((m) => !m.temporary), text = JSON.stringify(machines);
+        if (text === this.machinesText) return;
+        this.machinesText = text; this.machines = machines;
+        cx.notify();
+      } catch {}
     });
   }
 
@@ -98,7 +114,7 @@ export default class Spaces extends View {
     const state = this.reconnecting[name] ??= { machine, removed: false };
     state.busy = true;
     state.error = null;
-    localStorage.setItem("machines.reconnecting", JSON.stringify(this.reconnecting));
+    store("machines.reconnecting", JSON.stringify(this.reconnecting));
     cx.notify();
     cx.spawn(async cx => {
       try {
@@ -113,7 +129,7 @@ export default class Spaces extends View {
         if (!state.removed) {
           await ask(["machine", "rm", name]);
           state.removed = true;
-          localStorage.setItem("machines.reconnecting", JSON.stringify(this.reconnecting));
+          store("machines.reconnecting", JSON.stringify(this.reconnecting));
         }
         const args = ["machine", "add"];
         if (machine.via) args.push("--via", machine.target);
@@ -123,13 +139,13 @@ export default class Spaces extends View {
         if (machine.temporary) args.push("--temp");
         await ask(args);
         this.folded.delete(name);
-        localStorage.setItem("machines.folded", JSON.stringify([...this.folded]));
+        store("machines.folded", JSON.stringify([...this.folded]));
         delete this.reconnecting[name];
       } catch (e) {
         state.error = String(e.message ?? e);
         state.busy = false;
       }
-      localStorage.setItem("machines.reconnecting", JSON.stringify(this.reconnecting));
+      store("machines.reconnecting", JSON.stringify(this.reconnecting));
       this.refreshMachines(cx);
       cx.notify();
     });
@@ -149,7 +165,7 @@ export default class Spaces extends View {
     // Gone and old: the list alone is empty right after a start.
     const listed = new Set(list.map((a) => a.address));
     for (const [k, c] of Object.entries(this.changed)) if (!listed.has(k) && now - c.at > 30 * 86400000) delete this.changed[k];
-    localStorage.setItem("changed", JSON.stringify(this.changed));
+    store("changed", JSON.stringify(this.changed));
   }
 
   // Live sub-agents of `addr`, depth first, each with the tree lines in front of it.
@@ -289,7 +305,7 @@ export default class Spaces extends View {
     }
 
     const ps = panes();
-    const tabs = spaces().flatMap((s) => s.tabs ?? []);
+    const tabs = this.sp.flatMap((s) => s.tabs ?? []);
     const labels = new Map(list.map((a) => {
       const tab = tabs.find((tab) => tab.id === a.tab);
       return [a.address, tab ? title(tab, lead(tab, ps)) : a.title || a.program?.name || ""];
@@ -336,7 +352,7 @@ export default class Spaces extends View {
 
   // The rows, under a header per machine once one isn't this computer.
   grouped(t) {
-    const rows = spaces().map((w, i) => ({ w, i }));
+    const rows = this.sp.map((w, i) => ({ w, i }));
     this.prepareAgents(rows);
     // A gap above each space after the first in its group.
     const draw = (r, n) => [this.row(r, t, n > 0), ...this.agentRows(r, t)];
@@ -369,7 +385,7 @@ export default class Spaces extends View {
         })
         .on_click((_e, cx) => {
           folded ? this.folded.delete(m) : this.folded.add(m);
-          localStorage.setItem("machines.folded", JSON.stringify([...this.folded]));
+          store("machines.folded", JSON.stringify([...this.folded]));
           cx.notify();
         })
         .child(mono(div()).min_w(0).truncate().text_color(t.muted).child(m ?? "This computer"))
@@ -400,9 +416,9 @@ export default class Spaces extends View {
   }
 
   row({ w, i }, t, gap = false) {
-    const fromIndex = this.pressed === null ? -1 : spaces().findIndex(s => s.id === this.pressed);
-    const colors = shared("space.colors") ?? {};
-    const fill = colors[w.id] ?? PALETTE[0];
+    // `this.sp` and `this.colors`: read once per render, not once per row.
+    const fromIndex = this.pressed === null ? -1 : this.sp.findIndex(s => s.id === this.pressed);
+    const fill = this.colors[w.id] ?? PALETTE[0];
     return v_flex()
       .relative()
       .id(`space-${w.id}`)
@@ -425,6 +441,7 @@ export default class Spaces extends View {
         this.over = w.id;
       })
       .on_mouse_move((_e, cx) => {
+        if (this.pressed === null) return; // No drag: nothing to do on a pointer move.
         const source = spaces().find(s => s.id === this.pressed);
         const over = source && (source.machine ?? null) === (w.machine ?? null) ? w.id : null;
         if (this.pressed !== null && this.over !== over) {
@@ -479,10 +496,13 @@ export default class Spaces extends View {
       changed = true;
     }
     if (changed) setShared("space.colors", kept);
+    this.sp = sp; this.colors = kept;
     const list = this.grouped(t);
     return v_flex().size_full().min_h(0).bg(t.chrome).text_size(13)
-      .child(v_flex().flex_1().min_h(0).px(8).pb(14).overflow_y_scrollbar().mode("always")
+      .child(v_flex().id("spaces-list").flex_1().min_h(0).px(8).pb(14).overflow_y_scrollbar().mode("always")
         .on_mouse_up("left", (_e, cx) => { this.pressed = null; cx.notify(); })
+        // The button released outside the list gives no mouse-up here: the pointer's exit ends the drag.
+        .on_hover((on, cx) => { if (!on && this.pressed !== null) { this.pressed = null; this.over = null; cx.notify(); } })
         .children(list));
   }
 }

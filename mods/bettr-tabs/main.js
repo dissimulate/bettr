@@ -32,6 +32,10 @@ const PANEL_BUTTONS = { files: ["Files", `${ICONS}/list-tree.svg`], changes: ["C
 const PANELS = Object.keys(PANEL_BUTTONS), WIDTH = 368;
 const panelOrder = () => shared("bettr.panelOrder") ?? [];
 const BLOCK_CHECK_MS = 5000, WATCH_RETRY_MS = 30000;
+// The open panels leave MAIN_MIN px for the terminals; a panel squeezed to fit keeps PANEL_MIN.
+const MAIN_MIN = 320, PANEL_MIN = 200;
+// The open panels of this many spaces are remembered; then those of spaces that are gone are dropped, oldest first.
+const SPACES_MAX = 200;
 // A tab's close slot: the 7px gap before the 12px icon. It slides open when the tab is selected.
 const CLOSE_SLOT = 19, TAB_MOTION = { duration: 160, easing: "ease-out" };
 const gap = () => find(layout(), "panel-body")?.gap ?? 0;
@@ -88,7 +92,9 @@ export default class Tabs extends View {
     if (!this.mods || !blocksDiffer(layout(), this.mods, panelOrder())) return;
     try {
       const path = `${appHome()}/layouts/${shared("layout")}.json`, text = await readTextFile(path);
-      await writeTextFile(path, `${JSON.stringify(withBlocks(JSON.parse(text), this.mods, panelOrder()), null, 2)}\n`, text);
+      const next = `${JSON.stringify(withBlocks(JSON.parse(text), this.mods, panelOrder()), null, 2)}\n`;
+      // The file is right already and the shown layout is not (Herdr has not read it, or refused it): no write.
+      if (next !== text) await writeTextFile(path, next, text);
     } catch {
       // Tried again at the next check.
     }
@@ -113,7 +119,8 @@ export default class Tabs extends View {
   setOpen(want, now, panel) {
     const between = gap();
     // Record the widths the person left: fixed children have px, the first gets the rest.
-    if (now.length && panel?.size?.px) {
+    // Not after a squeeze: those widths are the window's, not the person's.
+    if (now.length && panel?.size?.px && !this.squeezed) {
       const root = layout();
       let rest = panel.size.px - between * (now.length - 1);
       const shared = [];
@@ -127,8 +134,16 @@ export default class Tabs extends View {
     for (const id of this.panelIds(layout())) run(want.includes(id) ? "layout.show" : "layout.hide", { id });
     if (!want.length) { run("layout.hide", { id: "panel" }); return; }
     const width = id => this.widths[id] ?? this.mods?.find(mod => mod.id === id)?.width ?? WIDTH;
-    want.forEach((id, i) => run("layout.resize", i ? { id, px: width(id) } : { id, weight: 1 }));
-    run("layout.resize", { id: "panel", px: want.reduce((sum, id) => sum + width(id), 0) + between * (want.length - 1) });
+    // All the panels fit in the panel's `max` and in the window (the tab bar is as wide as the work
+    // column): when they do not, each gets the same share less.
+    const body = find(layout(), "work-body"), edge = typeof body?.padding === "number" ? body.padding : 0;
+    const room = Math.min(panel?.max ?? Infinity, this.barWidth ? this.barWidth - 2 * edge - (body?.gap ?? 0) - MAIN_MIN : Infinity);
+    const gaps = between * (want.length - 1), total = want.reduce((sum, id) => sum + width(id), 0);
+    this.squeezed = total + gaps > room;
+    const share = this.squeezed ? Math.max(0, room - gaps) / total : 1;
+    const sizes = want.map(id => this.squeezed ? Math.max(PANEL_MIN, Math.floor(width(id) * share)) : width(id));
+    want.forEach((id, i) => run("layout.resize", i ? { id, px: sizes[i] } : { id, weight: 1 }));
+    run("layout.resize", { id: "panel", px: sizes.reduce((sum, px) => sum + px, 0) + gaps });
     run("layout.show", { id: "panel" });
   }
 
@@ -169,7 +184,13 @@ export default class Tabs extends View {
       this.pending = null;
     }
     if (same(this.panels[space.id] ?? [], now) && space.id in this.panels) return;
+    delete this.panels[space.id]; // Set again at the end: the newest choice is the last key.
     this.panels[space.id] = now;
+    const known = Object.keys(this.panels);
+    if (known.length > SPACES_MAX) {
+      const here = new Set(spaces().map(s => s.id));
+      for (const id of known.filter(id => !here.has(id)).slice(0, known.length - SPACES_MAX)) delete this.panels[id];
+    }
     try { localStorage.setItem("panels", JSON.stringify(this.panels)); } catch {}
   }
 
@@ -241,8 +262,11 @@ export default class Tabs extends View {
         .on_click(() => this.setOpen(on ? open.filter(p => p !== id) : this.panelIds(layout()).filter(p => p === id || open.includes(p)), open, panel))
         .child(icon ? svg(icon).size(14) : div().text_size(12).child(label.slice(0, 1).toUpperCase()));
     };
-    return h_flex().size_full().min_w(0).px(10).pl(lightsPadding).pt(8).gap(6).items_center().bg(t.chrome)
+    return h_flex().id("tab-bar").size_full().min_w(0).px(10).pl(lightsPadding).pt(8).gap(6).items_center().bg(t.chrome)
+      .on_size_change(size => { this.barWidth = size.width; })
       .on_mouse_up("left", () => { this.pressed = null; })
+      // The button released outside the bar gives no mouse-up here: the pointer's exit ends the drag.
+      .on_hover(on => { if (!on) this.pressed = null; })
       .on_scroll_wheel(e => { if (Math.abs(e.delta.y) >= 1) run(e.delta.y > 0 ? "tab.prev" : "tab.next"); })
       .child(h_flex().id("tab-scroll").flex_1().min_w(0).h_full().items_center().gap(3).overflow_x_scrollbar().children(shown.map(item)))
       .child(button("tab-new", "+", () => openOverlay({ mod: "new-menu", kind: "popup", width: 250, height: 512 })))

@@ -37,6 +37,18 @@ function find(node, id) {
   return null;
 }
 
+// `color` (#rgb, #rrggbb or #rrggbbaa) at `alpha` (hex 00-ff); any other color as it is.
+// The same helper is in bettr-spaces, bettr-tabs and bettr-activity (a mod cannot import another's files).
+const tint = (color, alpha) => {
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(color)?.[1];
+  if (!hex) return color;
+  return `#${hex.length === 3 ? [...hex].map((c) => c + c).join("") : hex.slice(0, 6)}${alpha}`;
+};
+
+// The panel's column in Bettr's layout. A hidden copy stays alive: its timer and folder watch do no
+// work until it is drawn again. In a layout without this column, the panel always refreshes.
+const hidden = () => Boolean(find(layout(), "changes")?.hidden);
+
 // Numbers each diff line once, so a frame only draws the rows on screen.
 function diffRows(lines) {
   let old = 0, next = 0;
@@ -55,6 +67,9 @@ export default class Changes extends View {
   init(_props, cx) {
     if (props()?.section === "worktrees") return this.initWorktrees(cx);
     this.files = []; this.rows = []; this.diffWidth = 0; this.message = ""; this.handle = cx.focus_handle();
+    // Untracked files' line counts by full path, kept until the folder watch names the file.
+    // `touches` counts the watch's reports, so a file that changed during its read is not kept.
+    this.lines = new Map(); this.touches = 0;
     this.input = InputState.new({ placeholder: "Commit message" });
     this.input.on("change", (_e, cx) => {
       const hadMessage = Boolean(this.message.trim());
@@ -66,41 +81,68 @@ export default class Changes extends View {
     this.input.on("blur", (_e, cx) => { this.typing = false; cx.notify(); });
     this.refresh(cx);
     cx.timer.every(POLL_MS, (cx) => {
-      if (!this.watched || Date.now() - (this.refreshedAt ?? 0) >= WATCHED_POLL_MS) this.refresh(cx);
+      if (this.watched && Date.now() - (this.refreshedAt ?? 0) < WATCHED_POLL_MS) return;
+      // The timer also catches what the watch did not report: count every new file again.
+      this.touch(null);
+      this.later(cx);
     });
   }
 
+  // `this.watched` is this watch's own object: a loop that waits for an old context ends at its
+  // next change, also when the new context has the same root.
   watch(root, cx) {
-    if (this.on || this.watched === root) return;
-    this.watched = root;
+    if (this.on || this.watched?.root === root) return;
+    const mine = this.watched = { root };
     cx.spawn(async (cx) => {
       try {
-        while (this.watched === root) {
-          await watchFolder(root);
+        while (this.watched === mine) {
+          const paths = await watchFolder(root);
+          if (this.watched !== mine) return;
+          this.touch(paths);
           await cx.sleep(WATCH_DEBOUNCE_MS);
-          if (this.watched === root) this.refresh(cx);
+          if (this.watched === mine) this.later(cx);
         }
-      } catch { this.watched = null; }
+      } catch { if (this.watched === mine) this.watched = null; }
     });
+  }
+
+  // Forget the line counts of the changed files (`paths` from the folder watch), or of all of them.
+  touch(paths) {
+    this.touches += 1;
+    if (!Array.isArray(paths) || !paths.length || paths.length > 500) { this.lines.clear(); return; }
+    for (const full of [...this.lines.keys()]) {
+      if (paths.some((p) => full === p || full.endsWith(`/${p}`) || full.startsWith(`${p}/`))) this.lines.delete(full);
+    }
+  }
+
+  // A refresh from the timer or the folder watch. A hidden panel waits until it is drawn.
+  later(cx) {
+    if (hidden()) this.stale = true; else this.refresh(cx);
   }
 
   refresh(cx) {
     // A change during a refresh may be missed by it: refresh again when it ends. A commit refreshes when it ends.
+    this.stale = false;
     if (this.loading) { this.again = true; return; }
     if (this.busy) return;
     const { cwd, on } = location(), context = key();
     if (context !== this.context) {
-      this.context = context; this.root = null; this.files = []; this.open = null;
+      this.context = context; this.root = null; this.files = []; this.open = null; this.lines.clear();
       this.setLines([]); this.message = ""; this.input.set_value(""); this.error = null; this.note = null; this.watched = null; this.closed = false; this.limited = false;
     }
     if (!cwd) return;
     this.loading = true; this.again = false; this.refreshedAt = Date.now();
     cx.spawn(async (cx) => {
       try {
-        const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, on });
-        if (key() !== context) return;
-        if (top.code !== 0) { this.root = null; this.files = []; this.setLines([]); this.open = null; this.error = "Not a git repository"; return; }
-        const root = top.stdout.trim(), git = (args) => exec("git", [...READ, ...args], { cwd: root, on });
+        // The root is found once per context, and again after a refresh that failed.
+        let root = this.unsure ? null : this.root;
+        if (!root) {
+          const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, on });
+          if (key() !== context) return;
+          if (top.code !== 0) { this.root = null; this.files = []; this.setLines([]); this.open = null; this.error = "Not a git repository"; return; }
+          root = top.stdout.trim();
+        }
+        const git = (args) => exec("git", [...READ, ...args], { cwd: root, on });
         const status = await git(["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all"]);
         if (status.code !== 0) throw new Error(status.stderr);
         const head = await git(["rev-parse", "--verify", "HEAD"]);
@@ -124,7 +166,20 @@ export default class Changes extends View {
           const stat = stats[path] ?? { add: 0, del: 0 };
           files.push({ path, status: s, fresh, ...stat });
         }
-        if (key() !== context) return;
+        // A new file has no numstat: count its lines, as the Worktrees section does. Each file is
+        // read once, then again only after the folder watch names it.
+        const kept = new Set();
+        for (const file of files.filter((f) => f.fresh).slice(0, UNTRACKED_MAX)) {
+          const full = `${root}/${file.path}`, touches = this.touches;
+          kept.add(full);
+          if (this.lines.has(full)) { file.add = this.lines.get(full); continue; }
+          const text = await readTextFile(full, { on }).catch(() => null);
+          if (key() !== context) return;
+          file.add = text && !text.includes("\0") ? countLines(text) : 0;
+          if (touches === this.touches) this.lines.set(full, file.add);
+        }
+        for (const full of [...this.lines.keys()]) if (!kept.has(full)) this.lines.delete(full);
+        this.unsure = false;
         this.root = root; this.on = on; this.hasHead = head.code === 0; this.files = files; this.limited = entries.length > 1000; this.error = null;
         this.watch(root, cx);
         if (this.open && !files.some((f) => f.path === this.open)) { this.open = null; this.setLines([]); }
@@ -134,7 +189,7 @@ export default class Changes extends View {
           try { await this.load(this.open, context); }
           catch { if (key() === context) this.setLines(["Cannot preview this diff (too large or unreadable)"]); }
         }
-      } catch (e) { if (key() === context) this.error = String(e); }
+      } catch (e) { if (key() === context) { this.error = String(e); this.unsure = true; } }
       finally {
         this.loading = false;
         if (this.again) this.refresh(cx);
@@ -200,7 +255,7 @@ export default class Changes extends View {
 
   diffRow({ kind, number, text }, t) {
     if (kind === "@") return div().w_full().px(12).h(20).flex_none().truncate().bg(t.raised).text_color(t.dim).child(text);
-    return h_flex().w_full().h(20).flex_none().gap(10).when(kind === "+", (e) => e.bg(t.ansi2 + "18")).when(kind === "-", (e) => e.bg(t.ansi1 + "18"))
+    return h_flex().w_full().h(20).flex_none().gap(10).when(kind === "+", (e) => e.bg(tint(t.ansi2, "18"))).when(kind === "-", (e) => e.bg(tint(t.ansi1, "18")))
       .child(div().w(30).flex_none().text_right().text_color(t.dim).child(number === undefined ? "" : String(number)))
       .child(div().flex_1().min_w(0).truncate().child(text));
   }
@@ -316,7 +371,7 @@ export default class Changes extends View {
 
   render(cx) {
     if (props()?.section === "worktrees") return this.worktrees(cx);
-    if (key() !== this.context) this.refresh(cx);
+    if (this.stale || key() !== this.context) this.refresh(cx);
     const t = theme(), add = this.files.reduce((n, f) => n + f.add, 0), del = this.files.reduce((n, f) => n + f.del, 0);
     const enabled = Boolean(this.message.trim() && this.root && !this.busy && !this.loading);
     return v_flex().id("changes").size_full().min_h(0).overflow_hidden().text_color(t.foreground).text_size(13).track_focus(this.handle)

@@ -156,8 +156,11 @@ export default class Context extends View {
     // bars: 5 px, radius 3. GPUI does not clip children to rounded corners, so the first
     // and last segments round their own outer ends.
     const segments = view.segments.filter(s => s.share > 0);
+    // More than the bar (context over the window, or many segments at the least width): all scaled to fit.
+    const widths = segments.map(s => Math.max(0.4, s.share * 100)), full = widths.reduce((sum, w) => sum + w, 0);
+    const fit = full > 100 ? 100 / full : 1;
     body.child(h_flex().w_full().h(5).mb(10).rounded(3).bg(t.raised)
-      .children(segments.map((s, i) => div().h_full().flex_none().w(`${Math.max(0.4, s.share * 100)}%`).bg(color(s.key, t))
+      .children(segments.map((s, i) => div().h_full().flex_none().w(`${widths[i] * fit}%`).bg(color(s.key, t))
         .when(i === 0, el => el.rounded_l(3)).when(i === segments.length - 1, el => el.rounded_r(3)))));
 
     for (const item of view.rows) {
