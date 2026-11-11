@@ -49,6 +49,13 @@ Files, Changes, Activity and Context panels side by side on the right.
   outer edge resizes the first open panel. The Layout dialog turns each button
   and the usage bars on or off, and its arrows set the panel order.
 - Activity and Context follow the focused agent.
+- A terminal header shows a yellow (`ansi3`) button at the far right, for
+  example **Resume: Claude Code (opus-5-5)**, when a shell is in front and the
+  terminal had a Claude Code or Codex session: after the agent exits, and after
+  a core stop, crash or reboot gives the terminal a new shell. Hover shows the
+  last prompt. A click types `claude --resume <id>` or `codex resume <id>` into
+  that shell (`bettr-pane/resume.js`). Claude Code finds the session only from
+  the folder it started in.
 - Activity: newest turn open, older turns one row. Two or more older finished
   turns fold behind "Show N turns". Click a step for details, a cut message to
   read it as Markdown. Same-verb neighbours share a row (`grep ×3, cd ×2`). A
