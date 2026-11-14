@@ -1,5 +1,6 @@
 // Workspace spaces: names in stable colors, grouped by machine when more than
-// one is known. Each space's agents are listed under it, with their sub-agents.
+// one is known. Each space's agents are listed under it, with their sub-agents, then
+// its other terminals (shells, editors).
 // Click to switch, right-click for its menu, drag to reorder.
 
 import { View, div, svg } from "gpui-kit";
@@ -247,7 +248,8 @@ export default class Spaces extends View {
   // tab number unless two rows in the space would otherwise read the same.
   agentRow(t, a, subs, now) {
     const name = this.names.get(a.address);
-    const when = this.changed[a.address]?.at ?? 0;
+    // A terminal that was an agent earlier still has that agent's stamp: no time for it.
+    const when = a.plain ? 0 : this.changed[a.address]?.at ?? 0;
     return h_flex()
       .id(`ag-${a.address}`)
       // The focused background starts at the space's tab count, with the same rounding.
@@ -273,8 +275,8 @@ export default class Spaces extends View {
       .child(this.status(t, a));
   }
 
-  // Each space's agents, in agents() order, and their row names. agent.next and
-  // agent.prev follow the order the list shows them in.
+  // Each space's agents, in agents() order, then its terminals that aren't agents, and
+  // their row names. agent.next and agent.prev follow the order the agents are shown in.
   prepareAgents(rows) {
     let list = agents();
     const now = Date.now();
@@ -291,6 +293,14 @@ export default class Spaces extends View {
       const since = (a) => this.changed[a.address]?.at ?? 0;
       list = [...list].sort((x, y) => urgency.get(y.address) - urgency.get(x.address) || since(y) - since(x) || y.seq - x.seq);
     }
+    // Terminals that aren't agents, as agent rows with no status: after the agents, in pane order.
+    const ps = panes();
+    const tabs = this.sp.flatMap((s) => (s.tabs ?? []).map((tab) => ({ ...tab, space: s.id })));
+    const plain = ps.filter((p) => p.terminal && !this.listed.has(p.terminal)).map((p) => ({
+      address: p.terminal, pane: p.pane, tab: p.tab, space: tabs.find((tab) => tab.id === p.tab)?.space,
+      status: null, program: p.program, title: p.title, focused: p.focused, plain: p,
+    }));
+    list = [...list, ...plain];
     const bySpace = new Map();
     for (const a of list) {
       if (!bySpace.has(a.space)) bySpace.set(a.space, []);
@@ -298,17 +308,15 @@ export default class Spaces extends View {
     }
     this.bySpace = bySpace;
     // Sent only when it changes: render runs on each hover and timer tick.
-    const order = rows.flatMap((r) => bySpace.get(r.w.id) ?? []).map((a) => a.address);
+    const order = rows.flatMap((r) => bySpace.get(r.w.id) ?? []).filter((a) => !a.plain).map((a) => a.address);
     if (order.join("\n") !== this.agentOrder) {
       this.agentOrder = order.join("\n");
       setAgentOrder(order);
     }
 
-    const ps = panes();
-    const tabs = this.sp.flatMap((s) => s.tabs ?? []);
     const labels = new Map(list.map((a) => {
       const tab = tabs.find((tab) => tab.id === a.tab);
-      return [a.address, tab ? title(tab, lead(tab, ps)) : a.title || a.program?.name || ""];
+      return [a.address, tab ? title(tab, a.plain ?? lead(tab, ps)) : a.title || a.program?.name || ""];
     }));
     const label = (a) => labels.get(a.address);
     const detail = new Map(list.map((a) => [a.address, /^\d+$/.test(label(a)) ? null : label(a)]));
