@@ -10,7 +10,7 @@ test("a shell with a session label gets the agent's resume command", () => {
   assert.deepEqual(resume(label("claude", "ff8f2341-79e6-44a6-b56c-099361f69786"), SHELL),
     { command: "claude --resume ff8f2341-79e6-44a6-b56c-099361f69786", title: "Resume: Claude Code", prompt: "" });
   assert.deepEqual(resume(label("codex", "0199a1b2-aaaa-7bbb-8ccc-123456789abc"), SHELL),
-    { command: "codex resume 0199a1b2-aaaa-7bbb-8ccc-123456789abc", title: "Resume: Codex", prompt: "" });
+    { command: "codex resume --no-daemon 0199a1b2-aaaa-7bbb-8ccc-123456789abc", title: "Resume: Codex", prompt: "" });
 });
 
 test("the title names the model of the same session only", () => {

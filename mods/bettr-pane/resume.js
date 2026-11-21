@@ -4,7 +4,7 @@
 
 const AGENTS = {
   claude: { name: "Claude Code", command: (id) => `claude --resume ${id}` },
-  codex: { name: "Codex", command: (id) => `codex resume ${id}` },
+  codex: { name: "Codex", command: (id) => `codex resume --no-daemon ${id}` },
 };
 
 // The ID is typed into a shell: accept only characters that need no quoting.

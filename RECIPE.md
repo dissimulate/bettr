@@ -53,7 +53,7 @@ Files, Changes, Activity and Context panels side by side on the right.
   example **Resume: Claude Code (opus-5-5)**, when a shell is in front and the
   terminal had a Claude Code or Codex session: after the agent exits, and after
   a core stop, crash or reboot gives the terminal a new shell. Hover shows the
-  last prompt. A click types `claude --resume <id>` or `codex resume <id>` into
+  last prompt. A click types `claude --resume <id>` or `codex resume --no-daemon <id>` into
   that shell (`bettr-pane/resume.js`). Claude Code finds the session only from
   the folder it started in.
 - Activity: newest turn open, older turns one row. Two or more older finished
