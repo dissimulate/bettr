@@ -27,8 +27,8 @@ function find(node, id) {
 // its own width; WIDTH is the width of a child the person never resized. Other mods add
 // their own panels: panel-mods.js. The Layout dialog sets their order: shared "bettr.panelOrder".
 const ICONS = "mods/bettr-tabs/icons";
-const PANEL_BUTTONS = { files: ["Files", `${ICONS}/list-tree.svg`], changes: ["Changes", `${ICONS}/git-compare.svg`],
-  activity: ["Activity", `${ICONS}/activity.svg`], context: ["Context", `${ICONS}/gauge.svg`] };
+const PANEL_BUTTONS = { files: ["Файлы", `${ICONS}/list-tree.svg`], changes: ["Изменения", `${ICONS}/git-compare.svg`],
+  activity: ["Активность", `${ICONS}/activity.svg`], context: ["Контекст", `${ICONS}/gauge.svg`] };
 const PANELS = Object.keys(PANEL_BUTTONS), WIDTH = 368;
 const panelOrder = () => shared("bettr.panelOrder") ?? [];
 const BLOCK_CHECK_MS = 5000, WATCH_RETRY_MS = 30000;

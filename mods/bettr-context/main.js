@@ -140,7 +140,7 @@ export default class Context extends View {
     if (props()?.section === "cache") return this.cache(t, state);
     this.showCache(Boolean(terminal));
     const header = h_flex().h(HEADER).flex_none().px(14).items_center().border_b(1).border_color(t.border)
-      .child(div().font_medium().child("Context"));
+      .child(div().font_medium().child("Контекст"));
     const root = v_flex().id("context").size_full().min_h(0).overflow_hidden()
       .text_color(t.foreground).text_size(13).child(header);
     if (!state) {
