@@ -250,7 +250,11 @@ def codex_app_server():
     Codex handles its own login and token refresh."""
     import subprocess
     import threading
-    server = subprocess.Popen(["codex", "app-server"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+    executable = "codex"
+    if sys.platform == "win32":
+        import shutil
+        executable = shutil.which("codex.exe") or shutil.which("codex.cmd") or executable
+    server = subprocess.Popen([executable, "app-server"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                               stderr=subprocess.DEVNULL, text=True)
     timer = threading.Timer(TIMEOUT_S, server.kill)
     timer.start()

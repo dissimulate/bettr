@@ -1,6 +1,6 @@
-# Bettr
+# Bettr for Windows
 
-A WIP [Herdr](https://herdr.dev) layout built for myself, mainly for use with Claude Code and Codex. Use it if you want.
+A Windows adaptation of [Bettr](https://github.com/dissimulate/bettr), a [Herdr](https://herdr.dev) layout for Claude Code and Codex.
 
 ![Bettr](preview.png)
 
@@ -18,13 +18,25 @@ A WIP [Herdr](https://herdr.dev) layout built for myself, mainly for use with Cl
 
 - Herdr 0.1.13 or later, Python 3.9 or later (`python3`).
 - Claude Code or Codex. Other agents show in the sidebar only.
-- macOS or Linux. On Windows the hooks and usage bars do not work.
+- On Windows, `python3` must resolve to a working interpreter. The official Python Install Manager provides this command.
 
-## Install and update
+## Develop and install on Windows
+
+Edit this checkout and run the installer from the project directory to try changes in Herdr.
+
+```powershell
+python3 -I scripts/install.py --update --hooks
+herdr-app do layout.switch --name bettr
+```
+
+The installer backs up replaced files and resolves Windows hook paths on the local machine.
+Restart Codex CLI after the initial installation and use `/hooks` to review any hooks it marks for review.
+The 5-hour allowance appears above the weekly allowance. Each bar shows the remaining percentage and time until reset.
+
+## Install and update on macOS or Linux
 
 ```sh
-git clone https://github.com/dissimulate/bettr.git ~/.local/share/bettr   # update: git -C ~/.local/share/bettr pull
-python3 ~/.local/share/bettr/scripts/install.py --update --hooks
+python3 scripts/install.py --update --hooks
 herdr-app do layout.switch '{"name":"bettr"}'
 ```
 

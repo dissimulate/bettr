@@ -18,6 +18,7 @@ setup = install.setup
 
 
 class InstallTests(unittest.TestCase):
+    @unittest.skipIf(sys.platform == "win32", "POSIX symlink and mode fixture")
     def test_remote_bundle_preserves_settings_and_is_repeatable(self):
         args = argparse.Namespace(agent=["claude"], update=True, hooks=True, remote="devbox")
         with tempfile.TemporaryDirectory() as folder:
@@ -67,9 +68,21 @@ class InstallTests(unittest.TestCase):
             saved, target = (backup / "paths.txt").read_text().strip().split("\t")
             self.assertEqual(((backup / saved).read_text(), target), (json.dumps(old), str(dotfile.resolve())))
 
+    def test_windows_hooks_resolve_paths_and_keep_their_identity(self):
+        source = '~/.config/herdr-app/mods/bettr-reporter/report.py'
+        original = {"command": f"python3 -I {source} codex"}
+        fragment = {"hooks": {"Stop": [{"hooks": [original]}]}}
+        with patch.object(Path, "home", return_value=Path("C:/Test User")), \
+                patch.object(sys, "executable", "C:/Program Files/Python/python.exe"):
+            resolved = setup.windows_commands(fragment)["hooks"]["Stop"][0]["hooks"][0]
+        self.assertEqual(resolved["command"], '"C:/Program Files/Python/python.exe" -I '
+                         '"C:/Test User/.config/herdr-app/mods/bettr-reporter/report.py" codex')
+        self.assertEqual(setup.identity(resolved), setup.identity(original))
+        self.assertEqual(original["command"], f"python3 -I {source} codex")
+
     def test_local_setup_also_merges_the_usage_hooks(self):
         # The gallery copies only the mod folders: this one command must set up every hook.
-        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"HOME": folder}), \
+        with tempfile.TemporaryDirectory() as folder, patch.object(Path, "home", return_value=Path(folder)), \
                 redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
             home = Path(folder)
             (home / ".claude").mkdir()
@@ -86,7 +99,7 @@ class InstallTests(unittest.TestCase):
             self.assertFalse((home / ".codex").exists())
 
     def test_generated_panel_blocks_are_not_a_layout_change(self):
-        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"HOME": folder}), \
+        with tempfile.TemporaryDirectory() as folder, patch.object(Path, "home", return_value=Path(folder)), \
                 redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
             target = Path(folder) / "herdr"
             install_args = ["install.py", "--target", str(target)]
@@ -134,7 +147,7 @@ class InstallTests(unittest.TestCase):
             self.assertTrue(install.same_layout(layout.read_bytes(), (install.ROOT / install.LAYOUT).read_bytes()))
 
     def test_invalid_settings_stop_the_install_unchanged(self):
-        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"HOME": folder}):
+        with tempfile.TemporaryDirectory() as folder, patch.object(Path, "home", return_value=Path(folder)):
             settings = Path(folder) / ".claude/settings.json"
             settings.parent.mkdir()
             settings.write_text("{not json")

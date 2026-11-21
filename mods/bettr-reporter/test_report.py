@@ -235,6 +235,7 @@ class ReporterTests(unittest.TestCase):
             self.assertIsNone(report.adapter(provider))
             self.assertIsNone(update(None, event("SubagentStart"), provider, 1))
 
+    @unittest.skipIf(sys.platform == "win32", "POSIX shell fixture")
     def test_isolated_hook_run_loads_adapters_and_publishes(self):
         package = Path(report.__file__).parent
         files = sorted(package.rglob("*"))

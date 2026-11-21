@@ -6,17 +6,19 @@ This file applies them to the `bettr.subagents` label state (SCHEMA.md), and
 `activity.py` applies them to the `bettr.activity` label state
 (mods/bettr-activity/SCHEMA.md), and `context.py` reads the transcript into the
 `bettr.context` label (mods/bettr-context/SCHEMA.md). None has provider-specific
-logic. Everything is local: no network or model requests. macOS and Linux only.
+logic. Everything is local: no network or model requests.
 """
+import errno
 import os
 import sys
 
 try:
     import fcntl
-except ImportError:  # Windows: the reporter does nothing there.
+except ImportError:
     fcntl = None
+    import msvcrt
 
-if __name__ == "__main__" and (fcntl is None or not os.environ.get("HC_TERMINAL_ID")):
+if __name__ == "__main__" and not os.environ.get("HC_TERMINAL_ID"):
     # Nothing to publish outside a Herdr terminal: answer before the slower imports.
     sys.stdin.buffer.read()
     print("{}")
@@ -230,10 +232,18 @@ def take(lock, deadline):
     """Lock a terminal's state, or raise when the hook's time is up."""
     while True:
         try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if fcntl is None:
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             os.utime(lock.name)  # A lock in use is never old, so `forget_old` keeps it.
             return
-        except BlockingIOError:
+        except OSError as error:
+            if not isinstance(error, BlockingIOError) and not (
+                fcntl is None and error.errno in {errno.EACCES, errno.EDEADLK}
+            ):
+                raise
             if time.monotonic() >= deadline:
                 raise TimeoutError("another hook held the state lock too long") from None
             time.sleep(0.02)
@@ -243,7 +253,7 @@ def record(event, provider, terminal, folder, send=publish):
     # The event's time is when the hook started: hooks can reach the lock out of order.
     now, started = time.time(), time.monotonic()
     module = adapter(provider)
-    if not terminal or fcntl is None or module is None or not isinstance(event, dict):
+    if not terminal or module is None or not isinstance(event, dict):
         return
     # Normalize before the lock: an adapter can wait for the agent's transcript.
     events = module.normalize(event)

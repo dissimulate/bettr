@@ -111,7 +111,7 @@ export default class UsageBars extends View {
   }
 
   card(snapshot, t, now) {
-    const primary = snapshot.windows.find(row => row.label === "Weekly") ?? snapshot.windows[0];
+    const primary = snapshot.windows.find(row => row.label === "5-hour") ?? snapshot.windows[0];
     const stale = now / 1000 - snapshot.updatedAt > STALE_S;
     const windowText = row => `${row.label} (${resetText(row.resetsAt, now)})`;
     // One row per window: the bar, its %, then the provider's icon (first row; room
@@ -119,13 +119,14 @@ export default class UsageBars extends View {
     const body = v_flex().gap(1);
     const windows = [primary, ...snapshot.windows.filter(row => row !== primary)];
     for (const [index, row] of windows.entries()) {
+      const remaining = 100 - row.used;
       const expired = row.resetsAt && row.resetsAt * 1000 <= now;
       // One color at any level (the muted text color, a step below white on dark themes);
       // a window that has reset, or data older than STALE_S, is dim until new data comes.
       const color = expired || stale ? t.dim : t.muted;
-      const description = `${snapshot.name} · ${windowText(row)} · ${Math.round(row.used)}% · Updated ${ageText(snapshot.updatedAt, now)}`;
+      const description = `${snapshot.name} · ${windowText(row)} · ${Math.round(remaining)}% remaining · Updated ${ageText(snapshot.updatedAt, now)}`;
       const track = div().flex_1().min_w(0).h(5).rounded(3).bg(t.raised).overflow_hidden()
-        .child(div().w(`${row.used}%`).h(5).rounded(3).bg(color));
+        .child(div().w(`${remaining}%`).h(5).rounded(3).bg(color));
       // A fixed 14 px box, so a wide or narrow icon never moves the bar.
       const mark = div().w(14).min_w(14).max_w(14).h(14).flex_none().overflow_hidden().flex().items_center().justify_center()
         .when(index === 0, el => el.child(image(this.icons[snapshot.agent] ?? "icons/agent.svg").w(11).h(11).flex_none()));
@@ -134,12 +135,11 @@ export default class UsageBars extends View {
         .when(this.refreshing, el => el.opacity(0.5))
         .tooltip(tip).accessibility_label(description)
         .on_click((_event, cx) => cx.spawn(async cx => { await this.refresh(cx); }))
-        .when(row !== primary, el => el
-          .child(div().text_size(11).text_color(t.dim).child(windowText(row))))
+        .child(div().text_size(11).text_color(t.dim).child(windowText(row)))
         .child(h_flex().w_full().gap(6).items_center().child(track)
           // Wide enough for "100%" at any value, so every bar ends at the same place.
           .child(mono(div()).w(28).flex_none().text_right().text_size(11).text_color(t.muted)
-            .child(`${Math.round(row.used)}%`))
+            .child(`${Math.round(remaining)}%`))
           .child(mark)));
     }
     return body;

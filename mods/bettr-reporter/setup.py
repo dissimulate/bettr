@@ -12,8 +12,10 @@ install` sets up all the hooks. With a machine, this file's own code runs there 
 The Layout dialog (bettr-chrome) and scripts/install.py both use it.
 """
 import datetime
+from copy import deepcopy
 from fnmatch import fnmatchcase
 import json
+import re
 import os
 from pathlib import Path
 import shutil
@@ -43,7 +45,8 @@ def package_files(root):
 def identity(hook):
     """What makes a hook this package's: its script (folder and file) and arguments.
     An edited interpreter or option (`python3.12`, `-B`) is still the same hook."""
-    words = hook.get("command").split() if isinstance(hook.get("command"), str) else []
+    command = hook.get("command")
+    words = [word.strip('"') for word in re.findall(r'"[^"]*"|\S+', command)] if isinstance(command, str) else []
     at = next((index for index, word in enumerate(words) if word.endswith(".py")), None)
     return None if at is None else ("/".join(words[at].replace("\\", "/").split("/")[-2:]), *words[at + 1:])
 
@@ -90,6 +93,18 @@ def hook_fragments(*folders):
                     if (folder / "hooks" / f"{agent}.json").is_file()] for agent in AGENTS}
 
 
+def windows_commands(fragment):
+    """Resolve the installed hook paths on the machine that will run them."""
+    fragment = deepcopy(fragment)
+    for groups in fragment["hooks"].values():
+        for group in groups:
+            for hook in group["hooks"]:
+                _, _, script, provider = hook["command"].split()
+                script = (Path.home() / script.removeprefix("~/")).as_posix()
+                hook["command"] = subprocess.list2cmdline([Path(sys.executable).as_posix(), "-I", script, provider])
+    return fragment
+
+
 def plan_hooks(fragments, agents=None):
     """Each agent's hook state on this machine, and the settings writes that merge `fragments`.
 
@@ -107,6 +122,8 @@ def plan_hooks(fragments, agents=None):
         existing = json.loads(path.read_bytes()) if path.is_file() else {}
         merged, ours = json.loads(json.dumps(existing)), set()
         for fragment in fragments[agent]:
+            if sys.platform == "win32":
+                fragment = windows_commands(fragment)
             merged = merge_hooks(merged, fragment)
             ours |= identities(fragment)
         states[agent] = "current" if merged == existing else "old" if identities(existing) & ours else "missing"
