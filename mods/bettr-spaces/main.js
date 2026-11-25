@@ -1,5 +1,7 @@
 // Workspace spaces: names in stable colors, grouped by machine when more than
-// one is known. Each space's agents are listed under it, with their sub-agents.
+// one is known. Each space's agents are listed under it, with their sub-agents, and
+// so are its tabs with no agent (shells, editors) when shared "bettr.plainTabs" is true:
+// the Layout dialog's "Tabs without agents" (bettr-chrome), off by default.
 // Click to switch, right-click for its menu, drag to reorder.
 
 import { View, div, svg } from "gpui-kit";
@@ -243,11 +245,12 @@ export default class Spaces extends View {
       .when(!open, (el) => el.child(String(subs.length)));
   }
 
-  // An agent under its space: its tab's name or its own title, never an automatic
-  // tab number unless two rows in the space would otherwise read the same.
+  // An agent, or a tab with no agent, under its space: its tab's name or its own title,
+  // never an automatic tab number unless two rows in the space would otherwise read the same.
   agentRow(t, a, subs, now) {
     const name = this.names.get(a.address);
-    const when = this.changed[a.address]?.at ?? 0;
+    // A terminal that was an agent earlier still has that agent's stamp: no time for it.
+    const when = a.plain ? 0 : this.changed[a.address]?.at ?? 0;
     return h_flex()
       .id(`ag-${a.address}`)
       // The focused background starts at the space's tab count, with the same rounding.
@@ -273,8 +276,8 @@ export default class Spaces extends View {
       .child(this.status(t, a));
   }
 
-  // Each space's agents, in agents() order, and their row names. agent.next and
-  // agent.prev follow the order the list shows them in.
+  // Each space's agents, in agents() order, and its tabs with no agent, and their row
+  // names. agent.next and agent.prev follow the order the agents are shown in.
   prepareAgents(rows) {
     let list = agents();
     const now = Date.now();
@@ -286,10 +289,31 @@ export default class Spaces extends View {
     this.subs = new Map(list.map((a) => [a.address, this.tree(this.all, a.address)]));
     // Priority (the default): most urgent first (counting its sub-agents), then most recently
     // changed. "order" keeps tab order. The sort button and its menu are in bettr-chrome.
-    if (shared("bettr.agentSort") !== "order") {
+    const byOrder = shared("bettr.agentSort") === "order";
+    if (!byOrder) {
       const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...this.subs.get(a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
       const since = (a) => this.changed[a.address]?.at ?? 0;
       list = [...list].sort((x, y) => urgency.get(y.address) - urgency.get(x.address) || since(y) - since(x) || y.seq - x.seq);
+    }
+    // A tab with no agent: one row with no status, for its lead terminal. Under Priority these
+    // rows come after the agents; under "order" every row is in tab order.
+    const ps = panes();
+    const tabs = this.sp.flatMap((s) => (s.tabs ?? []).map((tab) => ({ ...tab, space: s.id })));
+    const withAgent = new Set(list.map((a) => a.tab));
+    // Each tab has a focused pane: only focused() tells which one has the focus now.
+    const f = focused();
+    const plain = shared("bettr.plainTabs") !== true ? [] : tabs.filter((tab) => !withAgent.has(tab.id)).flatMap((tab) => {
+      const l = lead(tab, ps);
+      return l ? [{
+        address: l.terminal, pane: l.pane, tab: tab.id, space: tab.space, status: null, program: l.program,
+        title: l.title, focused: Boolean(f) && (f.pane ? f.pane === l.pane : f.terminal === l.terminal), plain: true,
+      }] : [];
+    });
+    list = [...list, ...plain];
+    if (byOrder) {
+      const at = new Map(tabs.map((tab, i) => [tab.id, i]));
+      const place = (a) => at.get(a.tab) ?? tabs.length;
+      list.sort((x, y) => place(x) - place(y));
     }
     const bySpace = new Map();
     for (const a of list) {
@@ -298,27 +322,23 @@ export default class Spaces extends View {
     }
     this.bySpace = bySpace;
     // Sent only when it changes: render runs on each hover and timer tick.
-    const order = rows.flatMap((r) => bySpace.get(r.w.id) ?? []).map((a) => a.address);
+    const order = rows.flatMap((r) => bySpace.get(r.w.id) ?? []).filter((a) => !a.plain).map((a) => a.address);
     if (order.join("\n") !== this.agentOrder) {
       this.agentOrder = order.join("\n");
       setAgentOrder(order);
     }
 
-    const ps = panes();
-    const tabs = this.sp.flatMap((s) => s.tabs ?? []);
     const labels = new Map(list.map((a) => {
       const tab = tabs.find((tab) => tab.id === a.tab);
       return [a.address, tab ? title(tab, lead(tab, ps)) : a.title || a.program?.name || ""];
     }));
     const label = (a) => labels.get(a.address);
-    const detail = new Map(list.map((a) => [a.address, /^\d+$/.test(label(a)) ? null : label(a)]));
+    // A row whose label is a tab number shows its program's name instead, unless that reads the same as another row.
+    const numbered = (a) => /^\d+$/.test(label(a));
+    const named = (a) => (numbered(a) && a.program?.name) || label(a);
     const seen = {};
-    for (const a of list) { const k = `${a.space}\u0000${detail.get(a.address) ?? ""}`; seen[k] = (seen[k] ?? 0) + 1; }
-    this.names = new Map(list.map((a) => {
-      const more = detail.get(a.address);
-      const plain = more ?? (seen[`${a.space}\u0000`] > 1 ? label(a) : a.program?.name || label(a));
-      return [a.address, plain];
-    }));
+    for (const a of list) { const k = `${a.space}\u0000${named(a)}`; seen[k] = (seen[k] ?? 0) + 1; }
+    this.names = new Map(list.map((a) => [a.address, numbered(a) && seen[`${a.space}\u0000${named(a)}`] > 1 ? label(a) : named(a)]));
   }
 
   // Looking at a done agent makes it idle; under Priority it keeps its place until
@@ -334,7 +354,7 @@ export default class Spaces extends View {
     return sawDone ? RANK.done : RANK[a.status] ?? 0;
   }
 
-  // A space's agent rows, each followed by its sub-agents unless folded.
+  // A space's rows (agents and tabs with no agent), each agent followed by its sub-agents unless folded.
   agentRows({ w }, t) {
     const shown = focused()?.agent;
     const now = Date.now();

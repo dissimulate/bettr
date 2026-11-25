@@ -1,5 +1,6 @@
 // The Layout dialog: switches that show or hide parts of this layout.
 // Usage limits is a layout block (layout.show / layout.hide; Herdr keeps it).
+// Tabs without agents: bettr-spaces lists them under their space when shared "bettr.plainTabs" is true (off by default).
 // Files, Changes, Activity and Context are buttons in the tab bar (bettr-tabs), kept in
 // shared "bettr.panels". Until changed here, Files and Changes follow Herdr's
 // setup (the welcome's "workspace.panels"); Activity and Context, ours, are on.
@@ -17,7 +18,7 @@ import { run, props, closeOverlay, layout, shared, setShared, exec, appHome, mac
 const remotes = () => machines().map((m) => m.name).filter(Boolean);
 const modPanels = () => shared("bettr.modPanels") ?? [];
 // The dialog's size when it opens: room for one row per mod panel and per machine.
-export const layoutSize = () => ({ width: 340, height: 300 + 30 * modPanels().length + (remotes().length ? 54 + 30 * remotes().length : 0) });
+export const layoutSize = () => ({ width: 340, height: 330 + 30 * modPanels().length + (remotes().length ? 54 + 30 * remotes().length : 0) });
 
 // Per machine: { state, agents?, detail? }. state is checking, installing, current,
 // old, missing or error. Kept while the app runs; checked again each time the dialog opens.
@@ -119,6 +120,8 @@ const rows = () => [
   { section: "Sidebar" },
   { id: "usage", label: "Usage limits", on: () => !find(layout(), "usage-limits")?.hidden,
     set: (on) => run(on ? "layout.show" : "layout.hide", { id: "usage-limits" }) },
+  { id: "plain-tabs", label: "Tabs without agents", on: () => shared("bettr.plainTabs") === true,
+    set: (on) => setShared("bettr.plainTabs", on) },
   { section: "Panels" },
   ...panelRows().map((r, i, all) => ({ ...r, move: {
     up: i > 0 ? () => movePanel(all, i, i - 1) : null,
