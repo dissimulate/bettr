@@ -1,6 +1,7 @@
 // Workspace spaces: names in stable colors, grouped by machine when more than
 // one is known. Each space's agents are listed under it, with their sub-agents, and
-// so are its tabs with no agent (shells, editors).
+// so are its tabs with no agent (shells, editors) when shared "bettr.plainTabs" is true:
+// the Layout dialog's "Tabs without agents" (bettr-chrome), off by default.
 // Click to switch, right-click for its menu, drag to reorder.
 
 import { View, div, svg } from "gpui-kit";
@@ -301,7 +302,7 @@ export default class Spaces extends View {
     const withAgent = new Set(list.map((a) => a.tab));
     // Each tab has a focused pane: only focused() tells which one has the focus now.
     const f = focused();
-    const plain = tabs.filter((tab) => !withAgent.has(tab.id)).flatMap((tab) => {
+    const plain = shared("bettr.plainTabs") !== true ? [] : tabs.filter((tab) => !withAgent.has(tab.id)).flatMap((tab) => {
       const l = lead(tab, ps);
       return l ? [{
         address: l.terminal, pane: l.pane, tab: tab.id, space: tab.space, status: null, program: l.program,
